@@ -29,8 +29,14 @@ You will need to install the requirements first
                             Bitbucket repo to pull data from.
       -u BITBUCKET_USERNAME, --bitbucket_username=BITBUCKET_USERNAME
                             Bitbucket username
+      -f JSON_META_TRANS, --meta_trans
+                            JSON with BitBucket metadata to GitHub labels translation. Defaults to meta_trans.json
 
     python migrate.py -g <githbu_user> -d <github_repo> -s <bitbucket_repo> -u <bitbucket_usename>
 
 Note: if you need to migrate to a GitHub organizational repository, use your personal username,
 but the appropriate API token for the repository.
+
+Note: If there's no meta mapping for a component from BitBucket, then a label with the origional name will be used.
+
+None: All issues that are not new or open on BitBucket will be closed on GitHub (i.e wontfix, duplicate, invalid, closed)

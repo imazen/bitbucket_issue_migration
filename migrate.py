@@ -18,6 +18,8 @@ from pygithub3 import Github
 from datetime import datetime, timedelta
 import urllib2
 import time
+import getpass
+import codecs
 
 import sys
 
@@ -44,15 +46,22 @@ parser.add_option("-s", "--bitbucket_repo", dest="bitbucket_repo",
 parser.add_option("-u", "--bitbucket_username", dest="bitbucket_username",
     help="Bitbucket username")
 
+parser.add_option("-f", "--meta_trans", dest="json_trans", default="meta_trans.json",
+    help="JSON with BitBucket metadata to GitHub labels translation")
+
 (options, args) = parser.parse_args()
 
+try:
+    meta_trans = json.load(open(options.json_trans))
+except Exception as e:
+    print "Could not open file {0}: {1}".format(options.json_trans, str(e))
+    sys.exit(1)
 
-bitbucket_password = raw_input('Please enter your github password: ')
+print "Log into Gituhub as {0}".format(options.github_username)
+github_password = getpass.getpass()
 
 # Login in to github and create object
-github = Github(login=options.github_username, password=bitbucket_password)
-
-
+github = Github(login=options.github_username, password=github_password)
 
 # Formatters
 
@@ -137,6 +146,8 @@ def get_comments(issue):
 
 start = 0
 issue_counts = 0
+created_labels = []
+created_milestones = []
 issues = []
 while True:
     url = "https://api.bitbucket.org/1.0/repositories/%s/%s/issues/?start=%d" % (options.bitbucket_username, options.bitbucket_repo, start)
@@ -156,56 +167,98 @@ while True:
 for issue in sorted(issues, key=lambda issue: issue['local_id']):
     comments = get_comments(issue)
     
+    bb_meta = issue.get('metadata')
+
+    # Always re-read milestones and labels since we continously create them
+    gh_ms = {m.title:m.number for m in github.issues.milestones.list(user=options.github_username,
+                                                                      repo=options.github_repo).all()}
+    gh_lb = [l.name for l in github.issues.labels.list(user=options.github_username,
+                                                       repo=options.github_repo).all()]
+
+    m_used = bb_meta['milestone']
+
+    if m_used:
+        m_used = m_used.encode('utf-8')
+
+    # Should we create this milestone?
+    m_create = None
+    if m_used and (m_used not in gh_ms.keys()):
+        m_create = bb_meta['milestone'].encode('utf-8')
+        created_milestones = m_create
+
+    # What labels will be used for this issue?
+    l_used = []
+    if bb_meta['component']:
+        # If no translation is found for the component the label will have
+        # the same component name
+        try:
+            comp = meta_trans['comp'][bb_meta['component']]
+        except:
+            comp = [bb_meta['component']]
+        l_used += comp
+    if bb_meta['kind']:
+        l_used += meta_trans['kind'][bb_meta['kind']]
+    if issue.get('status'):
+        l_used += meta_trans['status'][issue.get('status')]
+    if issue.get('priority'):
+        l_used += meta_trans['prio'][issue.get('priority')]
+
+    l_create = []
+    for l in l_used:
+        if l not in gh_lb:
+            l_create += [l]
+    created_labels += l_create
 
     if options.dry_run:
-        print "Title: {0}".format(issue.get('title'))
-        print "Body: {0}".format(format_body(issue))
-        print "Comments", [comment['body'] for comment in comments]
+        print u"Title: {0}".format(issue.get('title'))
+        print u"Body: {0}".format(format_body(issue))
+        print u"Milestone: {0}".format(bb_meta['milestone'])
+        print u"Kind: {0}".format(bb_meta['kind'])
+        print u"Component: {0}".format(bb_meta['component'])
+        print u"Status: {0}".format(issue.get('status'))
+        print u"Priority: {0}".format(issue.get('priority'))
+        print u"Comments", [comment['body'] for comment in comments]
+        print u"Issue will tagged with these labels: {0}".format(l_used)
+        print u"Need to create the following labels: {0}".format(l_create)
+        print u"This should be: {0}".format("closed" if issue.get('status') in ['resolved', 'duplicate', 'wontfix', 'invalid'] else "open")
+
     else:
-        # Create the isssue
+        # Create the isssue with labels and milestones
+
+        if m_create:
+            print "Creating new milestone: {0}".format(m_create)
+            github.issues.milestones.create(data={'title':m_create},
+                                            user=options.github_username,
+                                            repo=options.github_repo)
+
+
+        for l in l_create:
+            print "Creating new label: {0}".format(l.encode('utf-8'))
+            github.issues.labels.create(data={'name':l.encode('utf-8'), 'color':'C0C0C0'},
+                                            user=options.github_username,
+                                            repo=options.github_repo)
+
         issue_data = {'title': issue.get('title').encode('utf-8'),
                       'body': format_body(issue).encode('utf-8')}
+
+        if len(l_used) > 0:
+            issue_data['labels'] = [l.encode('utf-8') for l in l_used]
+
+        # This should be milestone number, not name
+        if m_used:
+            issue_data['milestone'] = gh_ms[m_used]
+
+        print "Creating issue with data: {0}".format(issue_data)
         ni = github.issues.create(issue_data,
                                   options.github_username,
                                   options.github_repo)
         
-        # Set the status and labels
-        if issue.get('status') == 'resolved':
+        # Set the status of the issue
+        if issue.get('status') in ['resolved', 'duplicate', 'wontfix', 'invalid']:
             github.issues.update(ni.number,
                                  {'state': 'closed'},
                                  user=options.github_username,
                                  repo=options.github_repo)
-
-        # Everything else is done with labels in github
-        # TODO: there seems to be a problem with the add_to_issue method of
-        #       pygithub3, so it's not possible to assign labels to issues
-        
-        elif issue.get('status') == 'wontfix':
-            pass
-        elif issue.get('status') == 'on hold':
-            pass
-        elif issue.get('status') == 'invalid':
-            pass
-        elif issue.get('status') == 'duplicate':
-            pass
-        elif issue.get('status') == 'wontfix':
-            pass
-        
-        #github.issues.labels.add_to_issue(ni.number,
-        #                                  issue['metadata']['kind'], 
-        #                                  user=options.github_username,
-        #                                  repo=options.github_repo,
-        #                                  )
-        #sys.exit()
-        
-        #github.issues.labels.add_to_issue(ni.number,
-        #                                  options.github_username,
-        #                                  options.github_repo,
-        #                                  ('import',))
-        
-        # Milestones
-        
-        
         
         # Add the comments
         comment_count = 0
@@ -218,7 +271,11 @@ for issue in sorted(issues, key=lambda issue: issue['local_id']):
 
         print "Created: {0} with {1} comments".format(issue['title'], comment_count)
     issue_counts += 1
-
+    
+print "---------------------------------------"
 print "Created {0} issues".format(issue_counts)
+# Remove duplicates created in dry-run
+print "Created {0} labels: {1}".format(len(set(created_labels)), list(set(created_labels)))
+print "Created {0} milestones: {1}".format(len(set(created_milestones)), list(set(created_milestones)))
 
 sys.exit()
