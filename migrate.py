@@ -49,6 +49,9 @@ parser.add_option("-u", "--bitbucket_username", dest="bitbucket_username",
 parser.add_option("-f", "--meta_trans", dest="json_trans", default="meta_trans.json",
     help="JSON with BitBucket metadata to GitHub labels translation")
 
+parser.add_option("-k", "--github_token", dest="github_token",
+    help="The GitHub token to be used for authentication when adding issues to an organization")
+
 (options, args) = parser.parse_args()
 
 try:
@@ -57,11 +60,17 @@ except Exception as e:
     print "Could not open file {0}: {1}".format(options.json_trans, str(e))
     sys.exit(1)
 
-print "Log into Gituhub as {0}".format(options.github_username)
-github_password = getpass.getpass()
+github = None
 
-# Login in to github and create object
-github = Github(login=options.github_username, password=github_password)
+if options.github_token:
+    print "Authenticating to GitHub using token"
+    github = Github(login=options.github_username, token=options.github_token)
+else:
+    print "Log into Gituhub as {0}".format(options.github_username)
+    github_password = getpass.getpass()
+
+    # Login in to github and create object
+    github = Github(login=options.github_username, password=github_password)
 
 # Formatters
 
@@ -184,7 +193,7 @@ for issue in sorted(issues, key=lambda issue: issue['local_id']):
     m_create = None
     if m_used and (m_used not in gh_ms.keys()):
         m_create = bb_meta['milestone'].encode('utf-8')
-        created_milestones = m_create
+        created_milestones += [m_create]
 
     # What labels will be used for this issue?
     l_used = []
@@ -230,6 +239,8 @@ for issue in sorted(issues, key=lambda issue: issue['local_id']):
             github.issues.milestones.create(data={'title':m_create},
                                             user=options.github_username,
                                             repo=options.github_repo)
+            gh_ms = {m.title:m.number for m in github.issues.milestones.list(user=options.github_username,
+                                                                             repo=options.github_repo).all()}
 
 
         for l in l_create:
@@ -248,7 +259,7 @@ for issue in sorted(issues, key=lambda issue: issue['local_id']):
         if m_used:
             issue_data['milestone'] = gh_ms[m_used]
 
-        print "Creating issue with data: {0}".format(issue_data)
+        #print "Creating issue with data: {0}".format(issue_data)
         ni = github.issues.create(issue_data,
                                   options.github_username,
                                   options.github_repo)

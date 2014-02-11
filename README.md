@@ -31,11 +31,13 @@ You will need to install the requirements first
                             Bitbucket username
       -f JSON_META_TRANS, --meta_trans
                             JSON with BitBucket metadata to GitHub labels translation. Defaults to meta_trans.json
+      -k GITHUB_API_TOKEN, --github_token
+                            GitHub API token used for authentication (useful if GITHUB_USERNAME is an organization)
 
     python migrate.py -g <githbu_user> -d <github_repo> -s <bitbucket_repo> -u <bitbucket_usename>
 
-Note: if you need to migrate to a GitHub organizational repository, use your personal username,
-but the appropriate API token for the repository.
+Note: If you need to migrate to a GitHub organizational repository set the GitHub username to the organization repo
+and use the GITHUB_API_TOKEN for authentication.
 
 Note: If there's no meta mapping for a component from BitBucket, then a label with the origional name will be used.
 
