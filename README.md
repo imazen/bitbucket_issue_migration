@@ -34,7 +34,7 @@ You will need to install the requirements first
       -k GITHUB_API_TOKEN, --github_token
                             GitHub API token used for authentication (useful if GITHUB_USERNAME is an organization)
 
-    python migrate.py -g <githbu_user> -d <github_repo> -s <bitbucket_repo> -u <bitbucket_usename>
+    python migrate.py -g <githbu_user> -d <github_repo> -s <bitbucket_repo> -u <bitbucket_usename> -k <github_token>
 
 Note: If you need to migrate to a GitHub organizational repository set the GitHub username to the organization repo
 and use the GITHUB_API_TOKEN for authentication.
