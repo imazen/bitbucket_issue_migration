@@ -69,7 +69,13 @@ def read_arguments():
     parser.add_argument(
         "-n", "--dry-run",
         action="store_true", dest="dry_run", default=False,
-        help="Perform a dry run and print eveything."
+        help="Perform a dry run."
+    )
+
+    parser.add_argument(
+        "-v", "--verebose",
+        action="store_true", dest="verbose", default=False,
+        help="verbose printing."
     )
 
     parser.add_argument(
@@ -249,6 +255,9 @@ def add_comments_to_issue(github_issue, bitbucket_comments):
             if not options.dry_run:
                 github_issue.create_comment(body.encode('utf-8'))
                 output('.')
+            if options.verbose:
+                output(body)
+                output('\n')
     output('\n')
 
 
@@ -273,6 +282,10 @@ def push_issue(gh_username, gh_repository, issue, body):
         # Set the status and labels
         if issue.get('status') == 'resolved':
             github_issue.edit(state = 'closed')
+
+    if options.verbose:
+        output(body)
+        output('\n')
 
     # Milestones
 
