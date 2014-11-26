@@ -326,7 +326,7 @@ if __name__ == "__main__":
     # Sort issues, to sync issue numbers on freshly created GitHub projects.
     # Note: not memory efficient, could use too much memory on large projects.
     for issue in sorted(issues, key=lambda issue: issue['local_id']):
-        body = format_body(options, issue).encode('utf-8')
+        body = format_body(options, issue)
         github_issue = push_issue(gh_username, gh_repository, issue, body)
         
         comments = get_comments(bb_url, issue)
