@@ -149,7 +149,9 @@ def clean_body(body):
                 lines.append("    " + line)
             else:
                 lines.append(line.replace("{{{", "`").replace("}}}", "`"))
-    return "\n".join(lines)
+    content = "\n".join(lines)
+    content = content.replace('%', '&#37;')
+    return content
 
 
 # Bitbucket fetch
@@ -253,8 +255,6 @@ def add_comments_to_issue(github_issue, bitbucket_comments):
 # GitHub push
 def push_issue(gh_username, gh_repository, issue, body):
     """ Migrates the given Bitbucket issue to Github. """
-
-    body = issue['content'].replace('%', '&#37;')
 
     output('Adding issue [%d]: %s' % (issue.get('local_id'), issue.get('title')))
 
