@@ -267,16 +267,16 @@ def push_issue(gh_username, gh_repository, issue, body):
 
     output('Adding issue [%d]: %s' % (issue.get('local_id'), issue.get('title')))
 
-    github_labels = []
-    # Set the status and labels
-    if issue.get('status') == 'resolved':
-        pass
-    # Everything else is done with labels in github
-    else:
-        github_labels = [github_label(issue['status'])]
-
     github_issue = None
     if not options.dry_run:
+        github_labels = []
+        # Set the status and labels
+        if issue.get('status') == 'resolved':
+            pass
+        # Everything else is done with labels in github
+        else:
+            github_labels = [github_label(issue['status'])]
+
         github_issue = github_repo.create_issue(issue['title'], body = body.encode('utf-8'), labels = github_labels)
 
         # Set the status and labels
@@ -292,20 +292,7 @@ def push_issue(gh_username, gh_repository, issue, body):
     return github_issue
 
 
-if __name__ == "__main__":
-    options = read_arguments()
-    bb_url = "https://bitbucket.org/api/1.0/repositories/{}/{}/issues".format(
-        options.bitbucket_username,
-        options.bitbucket_repo
-    )
-
-    # Cache Github tags, to avoid unnecessary API requests
-    label_cache = {}
-
-    google_project_name = options.github_repo
-
-    # fetch issues from Bitbucket
-    issues = get_issues(bb_url, options.start)
+def prepare_github(options):
 
     while True:
         github_password = getpass.getpass("Github password: ")
@@ -322,8 +309,8 @@ if __name__ == "__main__":
     # If the project name is specified as owner/project, assume that it's owned by either
     # a different user than the one we have credentials for, or an organization.
 
-    if "/" in google_project_name:
-        gh_username, gh_repository = google_project_name.split('/')
+    if "/" in options.github_repo:
+        gh_username, gh_repository = options.github_repo.split('/')
         try:
             github_owner = github.get_user(gh_username)
         except GithubException:
@@ -335,6 +322,28 @@ if __name__ == "__main__":
         github_owner = github_user
 
     github_repo = github_owner.get_repo(gh_repository)
+
+    return gh_username, gh_repository, github_repo
+
+
+if __name__ == "__main__":
+    options = read_arguments()
+    bb_url = "https://bitbucket.org/api/1.0/repositories/{}/{}/issues".format(
+        options.bitbucket_username,
+        options.bitbucket_repo
+    )
+
+    # Cache Github tags, to avoid unnecessary API requests
+    label_cache = {}
+
+    # prepare github information
+    if not options.dry_run:
+        gh_username, gh_repository, github_repo = prepare_github(options)
+    else:
+        gh_username, gh_repository, github_repo = None, None, None
+
+    # fetch issues from Bitbucket
+    issues = get_issues(bb_url, options.start)
 
     # Sort issues, to sync issue numbers on freshly created GitHub projects.
     # Note: not memory efficient, could use too much memory on large projects.
