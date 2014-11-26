@@ -230,7 +230,10 @@ def add_comments_to_issue(github_issue, bitbucket_comments):
     """ Migrates all comments from a Bitbucket issue to its Github copy. """
 
     # Retrieve existing Github comments, to figure out which Google Code comments are new
-    existing_comments = [comment.body for comment in github_issue.get_comments()]
+    if not options.dry_run:
+        existing_comments = [comment.body for comment in github_issue.get_comments()]
+    else:
+        existing_comments = []
 
     if len(bitbucket_comments) > 0:
         output(", adding comments")
@@ -266,10 +269,10 @@ def push_issue(gh_username, gh_repository, issue, body):
     github_issue = None
     if not options.dry_run:
         github_issue = github_repo.create_issue(issue['title'], body = body.encode('utf-8'), labels = github_labels)
-    
-    # Set the status and labels
-    if issue.get('status') == 'resolved':
-        github_issue.edit(state = 'closed')
+
+        # Set the status and labels
+        if issue.get('status') == 'resolved':
+            github_issue.edit(state = 'closed')
 
     # Milestones
 
@@ -326,8 +329,7 @@ if __name__ == "__main__":
         body = format_body(options, issue).encode('utf-8')
         github_issue = push_issue(gh_username, gh_repository, issue, body)
         
-        if github_issue:
-            comments = get_comments(bb_url, issue)
-            add_comments_to_issue(github_issue, comments)
+        comments = get_comments(bb_url, issue)
+        add_comments_to_issue(github_issue, comments)
 
     output("Created {} issues\n".format(len(issues)))
