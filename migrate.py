@@ -207,7 +207,7 @@ def get_comments(bb_url, issue):
             comments.append({
                 'user': format_user(comment['author_info']),
                 'created_at': comment['utc_created_on'],
-                'body': body.encode('utf-8'),
+                'body': body,
                 'number': comment['comment_id']
             })
 
@@ -253,7 +253,7 @@ def push_issue(gh_username, gh_repository, issue, body):
 
     body = issue['content'].replace('%', '&#37;')
 
-    output('Adding issue [%d]: %s' % (issue.get('local_id'), issue.get('title').encode('utf-8')))
+    output('Adding issue [%d]: %s' % (issue.get('local_id'), issue.get('title')))
 
     github_labels = []
     # Set the status and labels
