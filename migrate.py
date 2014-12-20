@@ -285,13 +285,13 @@ def add_comments_to_issue(github_issue, bitbucket_comments, dry_run=False, verbo
 
 
 # GitHub push
-def push_issue(github_repo, gh_username, gh_repository, issue, body):
+def push_issue(github_repo, issue, body, dry_run=False, verbose=False):
     """ Migrates the given Bitbucket issue to Github. """
 
     output('Adding issue [%d]: %s' % (issue.get('local_id'), issue.get('title')))
 
     github_issue = None
-    if not options.dry_run:
+    if not dry_run:
         github_labels = []
         # Set the status and labels
         if issue.get('status') == 'resolved':
@@ -307,7 +307,7 @@ def push_issue(github_repo, gh_username, gh_repository, issue, body):
         if issue.get('status') == 'resolved':
             github_issue.edit(state='closed')
 
-    if options.verbose:
+    if verbose:
         output(body)
         output('\n')
 
@@ -316,24 +316,24 @@ def push_issue(github_repo, gh_username, gh_repository, issue, body):
     return github_issue
 
 
-def prepare_github(options):
+def prepare_github(github_username, github_repo):
     while True:
         github_password = getpass.getpass("Github password: ")
         try:
-            Github(options.github_username, github_password).get_user().login
+            Github(github_username, github_password).get_user().login
             break
         except Exception:
             output("Bad credentials, try again.\n")
 
-    github = Github(options.github_username, github_password)
+    github = Github(github_username, github_password)
 
     github_user = github.get_user()
 
     # If the project name is specified as owner/project, assume that it's owned by either
     # a different user than the one we have credentials for, or an organization.
 
-    if "/" in options.github_repo:
-        gh_username, gh_repository = options.github_repo.split('/')
+    if "/" in github_repo:
+        gh_username, gh_repository = github_repo.split('/')
         try:
             github_owner = github.get_user(gh_username)
         except GithubException:
@@ -357,7 +357,8 @@ def main(options):
 
     # prepare github information
     if not options.dry_run:
-        gh_username, gh_repository, github_repo = prepare_github(options)
+        gh_username, gh_repository, github_repo = prepare_github(
+            options.github_username, options.github_repo)
     else:
         gh_username, gh_repository, github_repo = None, None, None
 
@@ -368,7 +369,8 @@ def main(options):
     # Note: not memory efficient, could use too much memory on large projects.
     for issue in sorted(issues, key=lambda issue: issue['local_id']):
         body = format_body(options.bitbucket_username, options.bitbucket_repo, issue)
-        github_issue = push_issue(github_repo, gh_username, gh_repository, issue, body)
+        github_issue = push_issue(github_repo, issue, body,
+                                  options.dry_run, options.verbose)
 
         comments = get_comments(bb_url, issue)
         add_comments_to_issue(github_issue, comments, options.dry_run, options.verbose)
