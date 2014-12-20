@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 # This file is part of the bitbucket issue migration script.
 #
@@ -26,16 +26,40 @@ import sys
 from github import Github
 from github import GithubException
 
-logging.basicConfig(level = logging.ERROR)
+
+logging.basicConfig(level=logging.ERROR)
 
 try:
     import json
 except ImportError:
     import simplejson as json
 
+
 def output(string):
     sys.stdout.write(string)
     sys.stdout.flush()
+
+
+class memoize(object):
+    def __init__(self):
+        self.cache = {}
+
+    def make_key(self, *args, **kw):
+        key = '-'.join(str(a) for a in args)
+        key += '-'.join(str(k) + '=' + str(v) for k, v in kw.items())
+        return key
+
+    def __call__(self, func):
+        def wrap(self, *args, **kw):
+            key = self.make_key(*args, **kw)
+            if key in self.cache:
+                return self.cache[key]
+            res = func(*args, **kw)
+            self.cache[key] = res
+            return res
+
+        return wrap
+
 
 def read_arguments():
     parser = argparse.ArgumentParser(
@@ -107,7 +131,7 @@ def format_name(issue):
         return "Anonymous"
 
 
-def format_body(options, issue):
+def format_body(bitbucket_username, bitbucket_repo, issue):
     content = clean_body(issue.get('content'))
     return u"""{}
 
@@ -118,7 +142,7 @@ def format_body(options, issue):
 """.format(
         content,
         '-' * 40,
-        options.bitbucket_username, options.bitbucket_repo, issue['local_id'],
+        bitbucket_username, bitbucket_repo, issue['local_id'],
         format_name(issue),
         issue['created_on']
     )
@@ -222,23 +246,22 @@ def get_comments(bb_url, issue):
     return comments
 
 
-def github_label(name, color = "FFFFFF"):
+# Cache Github tags, to avoid unnecessary API requests
+@memoize()
+def github_label(github_repo, name, color="FFFFFF"):
     """ Returns the Github label with the given name, creating it if necessary. """
-
     try:
-        return label_cache[name]
-    except KeyError:
-        try:
-            return label_cache.setdefault(name, github_repo.get_label(name))
-        except GithubException:
-            return label_cache.setdefault(name, github_repo.create_label(name, color))
+        label = github_repo.get_label(name)
+    except GithubException:
+        label = github_repo.create_label(name, color)
+    return label
 
 
-def add_comments_to_issue(github_issue, bitbucket_comments):
+def add_comments_to_issue(github_issue, bitbucket_comments, dry_run=False, verbose=False):
     """ Migrates all comments from a Bitbucket issue to its Github copy. """
 
     # Retrieve existing Github comments, to figure out which Google Code comments are new
-    if not options.dry_run:
+    if not dry_run:
         existing_comments = [comment.body for comment in github_issue.get_comments()]
     else:
         existing_comments = []
@@ -252,17 +275,17 @@ def add_comments_to_issue(github_issue, bitbucket_comments):
             logging.info('Skipping comment %d: already present', i + 1)
         else:
             logging.info('Adding comment %d', i + 1)
-            if not options.dry_run:
+            if not dry_run:
                 github_issue.create_comment(body.encode('utf-8'))
                 output('.')
-            if options.verbose:
+            if verbose:
                 output(body)
                 output('\n')
     output('\n')
 
 
 # GitHub push
-def push_issue(gh_username, gh_repository, issue, body):
+def push_issue(github_repo, gh_username, gh_repository, issue, body):
     """ Migrates the given Bitbucket issue to Github. """
 
     output('Adding issue [%d]: %s' % (issue.get('local_id'), issue.get('title')))
@@ -275,13 +298,14 @@ def push_issue(gh_username, gh_repository, issue, body):
             pass
         # Everything else is done with labels in github
         else:
-            github_labels = [github_label(issue['status'])]
+            github_labels = [github_label(github_repo, issue['status'])]
 
-        github_issue = github_repo.create_issue(issue['title'], body = body.encode('utf-8'), labels = github_labels)
+        github_issue = github_repo.create_issue(
+            issue['title'], body=body.encode('utf-8'), labels=github_labels)
 
         # Set the status and labels
         if issue.get('status') == 'resolved':
-            github_issue.edit(state = 'closed')
+            github_issue.edit(state='closed')
 
     if options.verbose:
         output(body)
@@ -293,7 +317,6 @@ def push_issue(gh_username, gh_repository, issue, body):
 
 
 def prepare_github(options):
-
     while True:
         github_password = getpass.getpass("Github password: ")
         try:
@@ -326,15 +349,11 @@ def prepare_github(options):
     return gh_username, gh_repository, github_repo
 
 
-if __name__ == "__main__":
-    options = read_arguments()
+def main(options):
     bb_url = "https://bitbucket.org/api/1.0/repositories/{}/{}/issues".format(
         options.bitbucket_username,
         options.bitbucket_repo
     )
-
-    # Cache Github tags, to avoid unnecessary API requests
-    label_cache = {}
 
     # prepare github information
     if not options.dry_run:
@@ -348,10 +367,15 @@ if __name__ == "__main__":
     # Sort issues, to sync issue numbers on freshly created GitHub projects.
     # Note: not memory efficient, could use too much memory on large projects.
     for issue in sorted(issues, key=lambda issue: issue['local_id']):
-        body = format_body(options, issue)
-        github_issue = push_issue(gh_username, gh_repository, issue, body)
-        
+        body = format_body(options.bitbucket_username, options.bitbucket_repo, issue)
+        github_issue = push_issue(github_repo, gh_username, gh_repository, issue, body)
+
         comments = get_comments(bb_url, issue)
-        add_comments_to_issue(github_issue, comments)
+        add_comments_to_issue(github_issue, comments, options.dry_run, options.verbose)
 
     output("Created {} issues\n".format(len(issues)))
+
+
+if __name__ == "__main__":
+    options = read_arguments()
+    main(options)
