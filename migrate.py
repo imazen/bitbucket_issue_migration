@@ -73,17 +73,17 @@ def read_arguments():
     )
 
     parser.add_argument(
-        "bitbucket_username",
+        "bb_user",
         help="Your Bitbucket username"
     )
 
     parser.add_argument(
-        "bitbucket_repo",
+        "bb_repo",
         help="Bitbucket repository to pull data from."
     )
 
     parser.add_argument(
-        "github_username",
+        "github_user",
         help="Your GitHub username"
     )
 
@@ -148,7 +148,7 @@ def format_name(issue):
         return "Anonymous"
 
 
-def format_body(bitbucket_username, bitbucket_repo, issue):
+def format_body(bb_user, bb_repo, issue):
     content = clean_body(issue.get('content'))
     return u"""{}
 
@@ -159,7 +159,7 @@ def format_body(bitbucket_username, bitbucket_repo, issue):
 """.format(
         content,
         '-' * 40,
-        bitbucket_username, bitbucket_repo, issue['local_id'],
+        bb_user, bb_repo, issue['local_id'],
         format_name(issue),
         issue['created_on']
     )
@@ -277,7 +277,7 @@ def github_label(github_repo, name, color="FFFFFF"):
     return label
 
 
-def add_comments_to_issue(github_issue, bitbucket_comments, dry_run=False, verbose=False):
+def add_comments_to_issue(github_issue, bb_comments, dry_run=False, verbose=False):
     """ Migrates all comments from a Bitbucket issue to its Github copy. """
 
     # Retrieve existing Github comments, to figure out which Google Code comments are new
@@ -286,10 +286,10 @@ def add_comments_to_issue(github_issue, bitbucket_comments, dry_run=False, verbo
     else:
         existing_comments = []
 
-    if len(bitbucket_comments) > 0:
+    if len(bb_comments) > 0:
         output(", adding comments")
 
-    for i, comment in enumerate(bitbucket_comments):
+    for i, comment in enumerate(bb_comments):
         body = u'_From {user} on {created_at}_\n\n{body}'.format(**comment)
         if body in existing_comments:
             logging.info('Skipping comment %d: already present', i + 1)
@@ -336,16 +336,16 @@ def push_issue(github_repo, issue, dry_run=False, verbose=False):
     return github_issue
 
 
-def prepare_github(github_username, github_repo):
+def prepare_github(github_user, github_repo):
     while True:
         github_password = getpass.getpass("Github password: ")
         try:
-            Github(github_username, github_password).get_user().login
+            Github(github_user, github_password).get_user().login
             break
         except Exception:
             output("Bad credentials, try again.\n")
 
-    github = Github(github_username, github_password)
+    github = Github(github_user, github_password)
 
     github_user = github.get_user()
 
@@ -353,20 +353,19 @@ def prepare_github(github_username, github_repo):
     # a different user than the one we have credentials for, or an organization.
 
     if "/" in github_repo:
-        gh_username, gh_repository = github_repo.split('/')
+        gh_user, gh_repo = github_repo.split('/')
         try:
-            github_owner = github.get_user(gh_username)
+            github_owner = github.get_user(gh_user)
         except GithubException:
             try:
-                github_owner = github.get_organization(gh_username)
+                github_owner = github.get_organization(gh_user)
             except GithubException:
                 github_owner = github_user
     else:
         github_owner = github_user
 
-    github_repo = github_owner.get_repo(gh_repository)
-
-    return gh_username, gh_repository, github_repo
+    gh_repo_obj = github_owner.get_repo(gh_repo)
+    return gh_repo_obj
 
 
 class IssueCache(object):
@@ -447,8 +446,7 @@ def iter_issue_from_file(infile, start=0, cache_dir=None):
         yield issue
 
 
-def iter_issue_from_bb(bb_url, bitbucket_username, bitbucket_repo, start=0,
-                       cache_dir=None):
+def iter_issue_from_bb(bb_url, bb_user, bb_repo, start=0, cache_dir=None):
     issues = get_issues(bb_url, start)
 
     # Sort issues, to sync issue numbers on freshly created GitHub projects.
@@ -458,7 +456,7 @@ def iter_issue_from_bb(bb_url, bitbucket_username, bitbucket_repo, start=0,
         cache = IssueCache(cache_dir, issue_id)
         if cache.changed(issue):
             output('fetching comments of issue [%d] ' % issue_id)
-            issue['formatted'] = format_body(bitbucket_username, bitbucket_repo, issue)
+            issue['formatted'] = format_body(bb_user, bb_repo, issue)
             comments = get_comments(bb_url, issue_id)
             cache.comments = comments
             output('.' * len(comments) + '\n')
@@ -481,13 +479,13 @@ def write_issues_to_file(issues, outfile):
 
 def main(options):
     bb_url = "https://bitbucket.org/api/1.0/repositories/{}/{}/issues".format(
-        options.bitbucket_username,
-        options.bitbucket_repo
+        options.bb_user,
+        options.bb_repo
     )
 
     # prepare github information
     if not options.dry_run:
-        _, _, github_repo = prepare_github(options.github_username, options.github_repo)
+        github_repo = prepare_github(options.github_user, options.github_repo)
     else:
         github_repo = None
 
@@ -496,8 +494,7 @@ def main(options):
                                                   options.cache_dir)
     else:
         iter_issue = lambda: iter_issue_from_bb(
-            bb_url, options.bitbucket_username, options.bitbucket_repo, options.start,
-            options.cache_dir)
+            bb_url, options.bb_user, options.bb_repo, options.start, options.cache_dir)
 
     if options.outfile:
         issues_count = write_issues_to_file(iter_issue(), options.outfile)
