@@ -22,6 +22,8 @@ import urllib2
 import getpass
 import logging
 import sys
+import os
+import time
 
 from github import Github
 from github import GithubException
@@ -115,6 +117,11 @@ def read_arguments():
     parser.add_argument(
         "-o", "--output", type=argparse.FileType('w'), dest="outfile", default=None,
         help="Output filename to file with json format"
+    )
+
+    parser.add_argument(
+        "-c", "--cache-dir", dest="cache_dir", default='.cache',
+        help="cache directory. default=.cache"
     )
 
     return parser.parse_args()
@@ -362,23 +369,102 @@ def prepare_github(github_username, github_repo):
     return gh_username, gh_repository, github_repo
 
 
-def iter_issue_from_file(infile, start=0):
+class IssueCache(object):
+
+    COMMENT_FILE_PREFIX = 'comment-'
+    ISSUE_FILE_NAME = 'issue.json'
+
+    def __init__(self, base_dir, issue_id):
+        self.issue_id = issue_id
+        self.base_dir = base_dir
+
+    @property
+    def base_path(self):
+        if self.base_dir is None:
+            return None
+        path = os.path.join(self.base_dir, str(self.issue_id))
+        return path
+
+    def save(self, name, data):
+        path = self.base_path
+        if not os.path.exists(path):
+            os.makedirs(path)
+        with open(os.path.join(path, name), 'w') as f:
+            json.dump(data, f, indent=4)
+
+    def load(self, name):
+        path = self.base_path
+        if path is None:
+            return None
+        with open(os.path.join(path, name), 'r') as f:
+            return json.load(f)
+
+    def delete_comments(self):
+        path = self.base_path
+        files = [f for f in os.listdir(path) if f.startswith('comments-')]
+        for f in files:
+            os.remove(os.path.join(path, f))
+
+    def changed(self, issue):
+        fmt = '%Y-%m-%d %H:%M:%S+00:00'
+        return (
+            time.strptime(self.issue['utc_last_updated'], fmt) <
+            time.strptime(issue['utc_last_updated'], fmt)
+        )
+
+    @property
+    def issue(self):
+        return self.load(self.ISSUE_FILE_NAME)
+
+    @issue.setter
+    def issue(self, value):
+        self.save(self.ISSUE_FILE_NAME, value)
+
+    @property
+    def comments(self):
+        path = self.base_path
+        comments = [
+            self.load(f)
+            for f in os.listdir(path)
+            if f.startswith(self.COMMENT_FILE_PREFIX)
+        ]
+        return comments
+
+    @comments.setter
+    def comments(self, comments):
+        self.delete_comments()
+        for comment in comments:
+            self.save('{0}{1[number]}.json'.format(self.COMMENT_FILE_PREFIX, comment),
+                      comment)
+
+
+def iter_issue_from_file(infile, start=0, cache_dir=None):
     data = json.load(infile)
     for issue in data['issues'][start:]:
+        cache = IssueCache(cache_dir, issue['id'])
+        cache.issue = issue['issue']
+        cache.comments = issue['comments']
         yield issue
 
 
-def iter_issue_from_bb(bb_url, bitbucket_username, bitbucket_repo, start=0):
+def iter_issue_from_bb(bb_url, bitbucket_username, bitbucket_repo, start=0,
+                       cache_dir=None):
     issues = get_issues(bb_url, start)
 
     # Sort issues, to sync issue numbers on freshly created GitHub projects.
     # Note: not memory efficient, could use too much memory on large projects.
     for issue in sorted(issues, key=lambda issue: issue['local_id']):
         issue_id = issue['local_id']
-        output('fetching comments of issue [%d] ' % issue_id)
-        issue['formatted'] = format_body(bitbucket_username, bitbucket_repo, issue)
-        comments = get_comments(bb_url, issue_id)
-        output('.' * len(comments) + '\n')
+        cache = IssueCache(cache_dir, issue_id)
+        if cache.changed(issue):
+            output('fetching comments of issue [%d] ' % issue_id)
+            issue['formatted'] = format_body(bitbucket_username, bitbucket_repo, issue)
+            comments = get_comments(bb_url, issue_id)
+            cache.comments = comments
+            output('.' * len(comments) + '\n')
+        else:
+            output('comments of issue [%d] is not changed\n' % issue_id)
+            comments = cache.comments
         yield {'id': issue_id, 'issue': issue, 'comments': comments}
 
 
@@ -406,10 +492,12 @@ def main(options):
         github_repo = None
 
     if options.infile:
-        iter_issue = lambda: iter_issue_from_file(options.infile, options.start)
+        iter_issue = lambda: iter_issue_from_file(options.infile, options.start,
+                                                  options.cache_dir)
     else:
         iter_issue = lambda: iter_issue_from_bb(
-            bb_url, options.bitbucket_username, options.bitbucket_repo, options.start)
+            bb_url, options.bitbucket_username, options.bitbucket_repo, options.start,
+            options.cache_dir)
 
     if options.outfile:
         issues_count = write_issues_to_file(iter_issue(), options.outfile)
