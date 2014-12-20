@@ -50,7 +50,7 @@ class memoize(object):
         return key
 
     def __call__(self, func):
-        def wrap(self, *args, **kw):
+        def wrap(*args, **kw):
             key = self.make_key(*args, **kw)
             if key in self.cache:
                 return self.cache[key]
@@ -186,9 +186,9 @@ def clean_body(body):
 
 # Bitbucket fetch
 def get_issues(bb_url, start_id):
-    '''
+    """
     Fetch the issues from Bitbucket
-    '''
+    """
     issues = []
 
     while True:
@@ -219,9 +219,9 @@ def get_issues(bb_url, start_id):
 
 
 def get_comments(bb_url, issue):
-    '''
+    """
     Fetch the comments for a Bitbucket issue
-    '''
+    """
     url = "{}/{}/comments/".format(
         bb_url,
         issue['local_id']
@@ -357,10 +357,9 @@ def main(options):
 
     # prepare github information
     if not options.dry_run:
-        gh_username, gh_repository, github_repo = prepare_github(
-            options.github_username, options.github_repo)
+        _, _, github_repo = prepare_github(options.github_username, options.github_repo)
     else:
-        gh_username, gh_repository, github_repo = None, None, None
+        github_repo = None
 
     # fetch issues from Bitbucket
     issues = get_issues(bb_url, options.start)
