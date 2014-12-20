@@ -107,6 +107,16 @@ def read_arguments():
         help="Bitbucket issue id from which to start import"
     )
 
+    parser.add_argument(
+        "-i", "--input", type=file, dest="infile", default=None,
+        help="Input issues filename to post to Bitbucket"
+    )
+
+    parser.add_argument(
+        "-o", "--output", type=argparse.FileType('w'), dest="outfile", default=None,
+        help="Output filename to file with json format"
+    )
+
     return parser.parse_args()
 
 
@@ -189,6 +199,7 @@ def get_issues(bb_url, start_id):
     """
     Fetch the issues from Bitbucket
     """
+    output('fetching issues: ')
     issues = []
 
     while True:
@@ -214,7 +225,9 @@ def get_issues(bb_url, start_id):
 
             issues += result['issues']
             start_id += len(result['issues'])
+            output('...%d' % len(issues))
 
+    output('\n')
     return issues
 
 
@@ -349,6 +362,37 @@ def prepare_github(github_username, github_repo):
     return gh_username, gh_repository, github_repo
 
 
+def iter_issue_from_file(infile, start=0):
+    data = json.load(infile)
+    for issue in data['issues'][start:]:
+        yield issue
+
+
+def iter_issue_from_bb(bb_url, bitbucket_username, bitbucket_repo, start=0):
+    issues = get_issues(bb_url, start)
+
+    # Sort issues, to sync issue numbers on freshly created GitHub projects.
+    # Note: not memory efficient, could use too much memory on large projects.
+    for issue in sorted(issues, key=lambda issue: issue['local_id']):
+        output('fetching comments of issue [%d] ' % issue.get('local_id'))
+        body = format_body(bitbucket_username, bitbucket_repo, issue)
+        comments = get_comments(bb_url, issue)
+        output('.' * len(comments) + '\n')
+        yield {'issue': issue, 'body': body, 'comments': comments}
+
+
+def push_issues_to_github(issue, github_repo, dry_run=False, verbose=False):
+    github_issue = push_issue(github_repo, issue['issue'], issue['body'],
+                              dry_run, verbose)
+    add_comments_to_issue(github_issue, issue['comments'], dry_run, verbose)
+
+
+def write_issues_to_file(issues, outfile):
+    issues = list(issues)
+    json.dump({'issues': issues}, outfile, indent=4)
+    return len(issues)
+
+
 def main(options):
     bb_url = "https://bitbucket.org/api/1.0/repositories/{}/{}/issues".format(
         options.bitbucket_username,
@@ -361,22 +405,20 @@ def main(options):
     else:
         github_repo = None
 
-    # fetch issues from Bitbucket
-    issues = get_issues(bb_url, options.start)
+    if options.infile:
+        iter_issue = lambda: iter_issue_from_file(options.infile, options.start)
+    else:
+        iter_issue = lambda: iter_issue_from_bb(
+            bb_url, options.bitbucket_username, options.bitbucket_repo, options.start)
 
-    # Sort issues, to sync issue numbers on freshly created GitHub projects.
-    # Note: not memory efficient, could use too much memory on large projects.
-    for issue in sorted(issues, key=lambda issue: issue['local_id']):
-        body = format_body(options.bitbucket_username, options.bitbucket_repo, issue)
-        github_issue = push_issue(github_repo, issue, body,
-                                  options.dry_run, options.verbose)
-
-        comments = get_comments(bb_url, issue)
-        add_comments_to_issue(github_issue, comments, options.dry_run, options.verbose)
-
-    output("Created {} issues\n".format(len(issues)))
+    if options.outfile:
+        issues_count = write_issues_to_file(iter_issue(), options.outfile)
+        output("Created {} issues to: {}\n".format(issues_count, options.outfile.name))
+    else:
+        for i, issue in enumerate(iter_issue()):
+            push_issues_to_github(issue, github_repo, options.dry_run, options.verbose)
+        output("Created {} issues\n".format(i + 1))
 
 
 if __name__ == "__main__":
-    options = read_arguments()
-    main(options)
+    main(read_arguments())
