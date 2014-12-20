@@ -231,13 +231,13 @@ def get_issues(bb_url, start_id):
     return issues
 
 
-def get_comments(bb_url, issue):
+def get_comments(bb_url, issue_id):
     """
     Fetch the comments for a Bitbucket issue
     """
     url = "{}/{}/comments/".format(
         bb_url,
-        issue['local_id']
+        issue_id
     )
     result = json.loads(urllib2.urlopen(url).read())
     ordered = sorted(result, key=lambda comment: comment["utc_created_on"])
@@ -298,10 +298,10 @@ def add_comments_to_issue(github_issue, bitbucket_comments, dry_run=False, verbo
 
 
 # GitHub push
-def push_issue(github_repo, issue, body, dry_run=False, verbose=False):
+def push_issue(github_repo, issue, dry_run=False, verbose=False):
     """ Migrates the given Bitbucket issue to Github. """
 
-    output('Adding issue [%d]: %s' % (issue.get('local_id'), issue.get('title')))
+    output('Adding issue [%d]: %s' % (issue['local_id'], issue['title']))
 
     github_issue = None
     if not dry_run:
@@ -314,14 +314,14 @@ def push_issue(github_repo, issue, body, dry_run=False, verbose=False):
             github_labels = [github_label(github_repo, issue['status'])]
 
         github_issue = github_repo.create_issue(
-            issue['title'], body=body.encode('utf-8'), labels=github_labels)
+            issue['title'], body=issue['formatted'].encode('utf-8'), labels=github_labels)
 
         # Set the status and labels
         if issue.get('status') == 'resolved':
             github_issue.edit(state='closed')
 
     if verbose:
-        output(body)
+        output(issue['formatted'])
         output('\n')
 
     # Milestones
@@ -374,16 +374,16 @@ def iter_issue_from_bb(bb_url, bitbucket_username, bitbucket_repo, start=0):
     # Sort issues, to sync issue numbers on freshly created GitHub projects.
     # Note: not memory efficient, could use too much memory on large projects.
     for issue in sorted(issues, key=lambda issue: issue['local_id']):
-        output('fetching comments of issue [%d] ' % issue.get('local_id'))
-        body = format_body(bitbucket_username, bitbucket_repo, issue)
-        comments = get_comments(bb_url, issue)
+        issue_id = issue['local_id']
+        output('fetching comments of issue [%d] ' % issue_id)
+        issue['formatted'] = format_body(bitbucket_username, bitbucket_repo, issue)
+        comments = get_comments(bb_url, issue_id)
         output('.' * len(comments) + '\n')
-        yield {'issue': issue, 'body': body, 'comments': comments}
+        yield {'id': issue_id, 'issue': issue, 'comments': comments}
 
 
 def push_issues_to_github(issue, github_repo, dry_run=False, verbose=False):
-    github_issue = push_issue(github_repo, issue['issue'], issue['body'],
-                              dry_run, verbose)
+    github_issue = push_issue(github_repo, issue['issue'], dry_run, verbose)
     add_comments_to_issue(github_issue, issue['comments'], dry_run, verbose)
 
 
