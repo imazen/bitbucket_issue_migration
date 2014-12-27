@@ -395,8 +395,11 @@ class IssueCache(object):
         path = self.base_path
         if path is None:
             return None
-        with open(os.path.join(path, name), 'r') as f:
-            return json.load(f)
+        try:
+            with open(os.path.join(path, name), 'r') as f:
+                return json.load(f)
+        except:
+            return None
 
     def delete_comments(self):
         path = self.base_path
@@ -405,6 +408,8 @@ class IssueCache(object):
             os.remove(os.path.join(path, f))
 
     def changed(self, issue):
+        if self.issue is None:
+            return True
         fmt = '%Y-%m-%d %H:%M:%S+00:00'
         return (
             time.strptime(self.issue['utc_last_updated'], fmt) <
@@ -455,6 +460,7 @@ def iter_issue_from_bb(bb_url, bb_user, bb_repo, start=0, cache_dir=None):
         issue_id = issue['local_id']
         cache = IssueCache(cache_dir, issue_id)
         if cache.changed(issue):
+            cache.issue = issue
             output('fetching comments of issue [%d] ' % issue_id)
             issue['formatted'] = format_body(bb_user, bb_repo, issue)
             comments = get_comments(bb_url, issue_id)
