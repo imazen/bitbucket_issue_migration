@@ -462,7 +462,6 @@ def iter_issue_from_bb(bb_url, bb_user, bb_repo, start=0, cache_dir=None):
         if cache.changed(issue):
             cache.issue = issue
             output('fetching comments of issue [%d] ' % issue_id)
-            issue['formatted'] = format_body(bb_user, bb_repo, issue)
             comments = get_comments(bb_url, issue_id)
             cache.comments = comments
             output('.' * len(comments) + '\n')
@@ -507,6 +506,7 @@ def main(options):
         output("Created {} issues to: {}\n".format(issues_count, options.outfile.name))
     else:
         for i, issue in enumerate(iter_issue()):
+            issue['formatted'] = format_body(options.bb_user, options.bb_repo, issue)
             push_issues_to_github(issue, github_repo, options.dry_run, options.verbose)
         output("Created {} issues\n".format(i + 1))
 
