@@ -34,7 +34,7 @@ class NodeToHash(object):
             return self.hg_to_git[full_node]
         return None
 
-    def __call__(self, hg_node):
+    def hgnode_to_githash(self, hg_node):
         git_hash = self.find_hg_node(hg_node)
         if git_hash is None:
             print('%r is not found in hg log' % hg_node)
@@ -42,19 +42,18 @@ class NodeToHash(object):
 
         return git_hash
 
+    def update_cset_marker(self, content):
+        r"""
+        replace '<<cset 0f18c81b53fc>>' pattern in content.
 
-def update_cset_marker(content, node_to_hash):
-    r"""
-    replace '<<cset 0f18c81b53fc>>' pattern in content.
-
-    before: '<<cset 0f18c81b53fc>>'  (hg-node)
-    after: '\<\<cset 20fa9c09b23e\>\>'  (git-hash)
-    """
-    hg_nodes = re.findall(r'<<cset ([^>]+)>>', content)
-    for hg_node in hg_nodes:
-        git_hash = node_to_hash(hg_node)
-        content = content.replace(r'<<cset %s>>' % hg_node, r'\<\<cset %s\>\>' % git_hash)
-    return content
+        before: '<<cset 0f18c81b53fc>>'  (hg-node)
+        after: '\<\<cset 20fa9c09b23e\>\>'  (git-hash)
+        """
+        hg_nodes = re.findall(r'<<cset ([^>]+)>>', content)
+        for hg_node in hg_nodes:
+            git_hash = self.hgnode_to_githash(hg_node)
+            content = content.replace(r'<<cset %s>>' % hg_node, r'\<\<cset %s\>\>' % git_hash)
+        return content
 
 
 def convert_issues_cset(infile, outfile, hglogfile, gitlogfile):
@@ -65,12 +64,12 @@ def convert_issues_cset(infile, outfile, hglogfile, gitlogfile):
     with open(infile) as f:
         issues = json.load(f)
 
-    node_to_hash = NodeToHash(hglogs, gitlogs)
+    n2h = NodeToHash(hglogs, gitlogs)
 
     for issue in issues['issues']:
-        issue['issue']['content'] = update_cset_marker(issue['issue']['content'], node_to_hash)
+        issue['issue']['content'] = n2h.update_cset_marker(issue['issue']['content'])
         for comment in issue['comments']:
-            comment['body'] = update_cset_marker(comment['body'], node_to_hash)
+            comment['body'] = n2h.update_cset_marker(comment['body'])
 
     with open(outfile, 'w') as f:
         json.dump(issues, f, indent=4)
