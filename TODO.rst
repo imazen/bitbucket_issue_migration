@@ -24,9 +24,6 @@ procedure
 TODO
 =======
 
-* hglog2json.py should output full node hash string.
-  Current implementation outputs short one.
-
 * Convert_issues_cset.py should convert all changeset like strings.
   Current implementation only convert in each '<<cset xxxx>>' string.
 

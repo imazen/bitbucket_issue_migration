@@ -60,7 +60,7 @@ def to_json(hg_path, outfile):
     for rev in f.get_changelog():
         r = {}
         r['revnum'] = rev
-        r['node'] = f.get_rev_msg(rev, '{node|short}')
+        r['node'] = f.get_rev_msg(rev, '{node}')
         r['date'] = f.get_rev_msg(rev, '{date|isodatesec}')
         r['email'] = f.get_rev_msg(rev, '{author}')
         desc = f.get_rev_msg(rev, '{desc}')
