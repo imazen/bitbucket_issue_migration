@@ -3,10 +3,10 @@
 import json
 import sys
 import re
+import bisect
 
 
 class NodeToHash(object):
-
     def __init__(self, hg_logs, git_logs):
         self.hg_to_git = {}
         date_to_hg = {}
@@ -19,16 +19,28 @@ class NodeToHash(object):
         for git_log in git_logs:
             date = git_log['date'].strip()
             if date not in date_to_hg:
-                #print('%r is not found in hg log' % git_log)
+                # print('%r is not found in hg log' % git_log)
                 continue
             self.hg_to_git[date_to_hg[date]] = git_log['node'].strip()
 
+        self.sorted_nodes = sorted(self.hg_to_git)
+
+    def find_hg_node(self, hg_node):
+        idx = bisect.bisect_left(self.sorted_nodes, hg_node)
+        if idx == len(self.sorted_nodes):
+            return None
+        full_node = self.sorted_nodes[idx]
+        if full_node.startswith(hg_node):
+            return self.hg_to_git[full_node]
+        return None
+
     def __call__(self, hg_node):
-        if hg_node not in self.hg_to_git:
+        git_hash = self.find_hg_node(hg_node)
+        if git_hash is None:
             print('%r is not found in hg log' % hg_node)
             return '?'
 
-        return self.hg_to_git[hg_node]
+        return git_hash
 
 
 def update_cset(content, node_to_hash):
