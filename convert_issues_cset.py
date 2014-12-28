@@ -1,15 +1,22 @@
 # -*- coding: utf-8 -*-
-
 import json
 import sys
 import re
 import bisect
+import urlparse
+import logging
+
+logging.basicConfig(
+    format='%(levelname)s: %(message)s',
+    level=logging.DEBUG
+)
+logger = logging.getLogger(__name__)
 
 
-class NodeToHash(object):
+class BbToGh(object):
     def __init__(self, hg_logs, git_logs, bb_url, gh_url):
-        self.bb_url = bb_url
-        self.gh_url = gh_url
+        self.bb_url = bb_url.rstrip('/')
+        self.gh_url = gh_url.rstrip('/')
         self.hg_to_git = {}
         date_to_hg = {}
 
@@ -21,7 +28,7 @@ class NodeToHash(object):
         for git_log in git_logs:
             date = git_log['date'].strip()
             if date not in date_to_hg:
-                # print('%r is not found in hg log' % git_log)
+                # logger.warning('%r is not found in hg log', git_log)
                 continue
             self.hg_to_git[date_to_hg[date]] = git_log['node'].strip()
 
@@ -39,12 +46,13 @@ class NodeToHash(object):
     def hgnode_to_githash(self, hg_node):
         git_hash = self.find_hg_node(hg_node)
         if git_hash is None:
-            print('%r is not found in hg log' % hg_node)
-            return '?'
+            logger.warning('%r is not found in hg log', hg_node)
+            return None
 
         return git_hash
 
     def update_all(self, content):
+        content = self.normalize_bb_url(content)
         content = self.update_cset_marker(content)
         content = self.update_bb_cset_link(content)
         content = self.update_bb_issue_link(content)
@@ -65,21 +73,47 @@ class NodeToHash(object):
                                       r'\<\<cset %s\>\>' % git_hash)
         return content
 
+    def normalize_bb_url(self, content):
+        content = content.replace('http://www.bitbucket.org/', 'https://bitbucket.org/')
+        content = content.replace('http://bitbucket.org/', 'https://bitbucket.org/')
+        content = content.replace('https://bitbucket.org/birkenfeld/sphinx/changeset/',
+                                  'https://bitbucket.org/birkenfeld/sphinx/commits/')
+        return content
 
     def update_bb_cset_link(self, content):
         r"""
         before: bb_url + '/commits/e282b3a8ef4802da3a685f10b5e9a39633e2c23a'
         after: gh_url + '/commit/1d063726ee185dce974f919f2ae696bd1b6b826b'
         """
-        # TODO: implement update_bb_cset_link
+        base_url = self.bb_url + '/commits/'
+        url_pairs = re.findall(base_url + r'([0-9a-f]+)(/?)', content)
+        for hg_node, rest_of_url in url_pairs:
+            git_hash = self.hgnode_to_githash(hg_node)
+            from_ = base_url + hg_node + rest_of_url
+            to_ = self.gh_url + '/commit/%s' % git_hash
+            content = content.replace(from_, to_)
+            logging.info("%s -> %s", from_, to_)
         return content
 
     def update_bb_src_link(self, content):
         r"""
         before: bb_url + '/src/e2a0e4fde89998ed46198291457d2a822bc60125/sphinx/builders/html.py?at=default#cl-321'
-        after: gh_url + '/blob/master/sphinx/builders/html.py#L321'
+        after: gh_url + '/blob/6336eab7c825852a058ed8a744be905c003ccbb8/sphinx/environment.py#L321'
         """
-        # TODO: implement update_bb_src_link
+        base_url = self.bb_url + '/src/'
+        url_pairs = re.findall(base_url + r'([^/]+)(/[\w\d/?=#.,_-]*)?', content)
+        for hg_node, rest_of_url in url_pairs:
+            parsed_url = urlparse.urlparse(rest_of_url)
+            line = ''
+            if re.match('cl-\d+', parsed_url.fragment):
+                line = '#L' + re.match('cl-(\d+)', parsed_url.fragment).groups()[0]
+            git_hash = self.hgnode_to_githash(hg_node)
+            if git_hash is None:
+                git_hash = 'master'
+            from_ = base_url + hg_node + rest_of_url
+            to_ = self.gh_url + '/blob/%s%s%s' % (git_hash, parsed_url.path, line)
+            content = content.replace(from_, to_)
+            logging.info("%s -> %s", from_, to_)
         return content
 
     def update_bb_issue_link(self, content):
@@ -87,7 +121,13 @@ class NodeToHash(object):
         before: bb_url + '/issue/63/make-sphinx'
         after: gh_url + '/issues/7'
         """
-        # TODO: implement update_bb_issue_link
+        base_url = self.bb_url + '/issue/'
+        issue_pairs = re.findall(base_url + r'(\d+)(/[\w\d.,_-]*)?', content)
+        for issue_id, rest_of_url in issue_pairs:
+            from_ = base_url + issue_id + rest_of_url
+            to_ = self.gh_url + '/issues/%s' % issue_id
+            content = content.replace(from_, to_)
+            logging.info("%s -> %s", from_, to_)
         return content
 
 
@@ -99,7 +139,7 @@ def convert_issues_cset(infile, outfile, hglogfile, gitlogfile):
     with open(infile) as f:
         issues = json.load(f)
 
-    n2h = NodeToHash(
+    n2h = BbToGh(
         hglogs,
         gitlogs,
         'https://bitbucket.org/birkenfeld/sphinx',

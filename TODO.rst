@@ -24,9 +24,6 @@ procedure
 TODO
 =======
 
-* Convert_issues_cset.py should convert all changeset like strings.
-  Current implementation only convert in each '<<cset xxxx>>' string.
-
 * migrate.py should create dummy issue if bitbucket issues has missing issue ID.
 
 * write documentation

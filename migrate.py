@@ -136,7 +136,7 @@ def format_user(author_info):
         return " ".join([author_info['first_name'], author_info['last_name']])
 
     if 'username' in author_info:
-        return '[{0}](http://bitbucket.org/{0})'.format(
+        return '[{0}](https://bitbucket.org/{0})'.format(
             author_info['username']
         )
 
