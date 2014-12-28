@@ -43,7 +43,7 @@ class NodeToHash(object):
         return git_hash
 
 
-def update_cset(content, node_to_hash):
+def update_cset_marker(content, node_to_hash):
     r"""
     replace '<<cset 0f18c81b53fc>>' pattern in content.
 
@@ -68,9 +68,9 @@ def convert_issues_cset(infile, outfile, hglogfile, gitlogfile):
     node_to_hash = NodeToHash(hglogs, gitlogs)
 
     for issue in issues['issues']:
-        issue['issue']['content'] = update_cset(issue['issue']['content'], node_to_hash)
+        issue['issue']['content'] = update_cset_marker(issue['issue']['content'], node_to_hash)
         for comment in issue['comments']:
-            comment['body'] = update_cset(comment['body'], node_to_hash)
+            comment['body'] = update_cset_marker(comment['body'], node_to_hash)
 
     with open(outfile, 'w') as f:
         json.dump(issues, f, indent=4)
