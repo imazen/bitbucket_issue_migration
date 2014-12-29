@@ -1,4 +1,18 @@
 # -*- coding: utf-8 -*-
+"""
+Convert issues changeset.
+
+* Normalize BB old URLs.
+* Convert BB changeset marker into GH.
+* Convert BB changeset links into GH.
+* Convert BB issue links into GH.
+* Convert BB src links into GH.
+
+run as::
+
+   $ convert_issues_cset.py issues.json issues_git.json hglog.json gitlog.json
+
+"""
 import json
 import sys
 import re
@@ -51,15 +65,15 @@ class BbToGh(object):
 
         return git_hash
 
-    def update_all(self, content):
+    def convert_all(self, content):
         content = self.normalize_bb_url(content)
-        content = self.update_cset_marker(content)
-        content = self.update_bb_cset_link(content)
-        content = self.update_bb_issue_link(content)
-        content = self.update_bb_src_link(content)
+        content = self.convert_cset_marker(content)
+        content = self.convert_bb_cset_link(content)
+        content = self.convert_bb_issue_link(content)
+        content = self.convert_bb_src_link(content)
         return content
 
-    def update_cset_marker(self, content):
+    def convert_cset_marker(self, content):
         r"""
         replace '<<cset 0f18c81b53fc>>' pattern in content.
 
@@ -80,7 +94,7 @@ class BbToGh(object):
                                   'https://bitbucket.org/birkenfeld/sphinx/commits/')
         return content
 
-    def update_bb_cset_link(self, content):
+    def convert_bb_cset_link(self, content):
         r"""
         before: bb_url + '/commits/e282b3a8ef4802da3a685f10b5e9a39633e2c23a'
         after: gh_url + '/commit/1d063726ee185dce974f919f2ae696bd1b6b826b'
@@ -95,7 +109,7 @@ class BbToGh(object):
             logging.info("%s -> %s", from_, to_)
         return content
 
-    def update_bb_src_link(self, content):
+    def convert_bb_src_link(self, content):
         r"""
         before: bb_url + '/src/e2a0e4fde89998ed46198291457d2a822bc60125/sphinx/builders/html.py?at=default#cl-321'
         after: gh_url + '/blob/6336eab7c825852a058ed8a744be905c003ccbb8/sphinx/environment.py#L321'
@@ -116,7 +130,7 @@ class BbToGh(object):
             logging.info("%s -> %s", from_, to_)
         return content
 
-    def update_bb_issue_link(self, content):
+    def convert_bb_issue_link(self, content):
         r"""
         before: bb_url + '/issue/63/make-sphinx'
         after: gh_url + '/issues/7'
@@ -147,9 +161,9 @@ def convert_issues_cset(infile, outfile, hglogfile, gitlogfile):
     )
 
     for issue in issues['issues']:
-        issue['issue']['content'] = n2h.update_all(issue['issue']['content'])
+        issue['issue']['content'] = n2h.convert_all(issue['issue']['content'])
         for comment in issue['comments']:
-            comment['body'] = n2h.update_all(comment['body'])
+            comment['body'] = n2h.convert_all(comment['body'])
 
     with open(outfile, 'w') as f:
         json.dump(issues, f, indent=4)
