@@ -24,7 +24,5 @@ procedure
 TODO
 =======
 
-* migrate.py should create dummy issue if bitbucket issues has missing issue ID.
-
 * write documentation
 

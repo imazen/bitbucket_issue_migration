@@ -7,6 +7,7 @@ Convert BB links and changeset markers in the issues.json
 * Convert BB changeset links into GH.
 * Convert BB issue links into GH.
 * Convert BB src links into GH.
+* Insert dummy issue if the issue numbers are not consecutive.
 
 run as::
 
@@ -19,6 +20,7 @@ import re
 import bisect
 import urlparse
 import logging
+import datetime
 
 logging.basicConfig(
     format='%(levelname)s: %(message)s',
@@ -151,6 +153,34 @@ def convert_issue_content(n2h, issue):
         comment['body'] = n2h.convert_all(comment['body'])
 
 
+def insert_missing_issue(issues):
+    class RetryException(BaseException):
+        pass
+
+    while 1:
+        try:
+            for idx in range(len(issues)):
+                if issues[idx]['id'] != idx + 1:
+                    d = datetime.datetime.now()
+                    issues.insert(idx, {
+                        'id': idx + 1,
+                        'issue': {
+                            "status": "invalid",
+                            "title": "(deleted)",
+                            "created_on": d.isoformat(),
+                            "content": "(deleted)\r\n",
+                            "comment_count": 0,
+                            "local_id": idx + 1,
+                            "utc_created_on": d.isoformat(),
+                        },
+                        'comments': [],
+                    })
+        except RetryException:
+            pass
+        else:
+            break
+
+
 def main(infile, outfile, hglogfile, gitlogfile):
     with open(hglogfile) as f:
         hglogs = json.load(f)['messages']
@@ -168,6 +198,8 @@ def main(infile, outfile, hglogfile, gitlogfile):
 
     for issue in issues['issues']:
         convert_issue_content(n2h, issue)
+
+    insert_missing_issue(issues['issues'])
 
     with open(outfile, 'w') as f:
         json.dump(issues, f, indent=4)
