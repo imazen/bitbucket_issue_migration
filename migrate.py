@@ -25,8 +25,8 @@ import sys
 import os
 import time
 
-from github import Github
-from github import GithubException
+import github
+from github import Github, GithubException
 
 
 logging.basicConfig(level=logging.ERROR)
@@ -335,9 +335,8 @@ def github_label(github_repo, name, color="FFFFFF"):
 def wait_and_retry(func, *args, **kwargs):
     while 1:
         try:
-            time.sleep(1)
             return func(*args, **kwargs)
-        except:
+        except github.GithubException:
             output('w')
             time.sleep(60)
 
@@ -392,11 +391,16 @@ def push_issue(github_repo, issue, meta_trans, dry_run=False, verbose=False):
             github_repo.create_milestone(milestone_tobe_create)
         gh_milestones, _, _ = prepare_milestones(github_repo)
 
+        if used_milestone:
+            milestone = github_repo.get_milestone(gh_milestones[used_milestone])
+        else:
+            milestone = github.GithubObject.NotSet
+
         github_issue = wait_and_retry(
             github_repo.create_issue,
             issue['title'],
             body=issue['formatted'].encode('utf-8'),
-            milestone=gh_milestones.get(used_milestone),
+            milestone=milestone,
             labels=github_labels)
 
         # Set the status of the issue
