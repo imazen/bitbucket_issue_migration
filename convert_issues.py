@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Convert issues changeset.
+Convert BB links and changeset markers in the issues.json
 
 * Normalize BB old URLs.
 * Convert BB changeset marker into GH.
@@ -10,7 +10,7 @@ Convert issues changeset.
 
 run as::
 
-   $ convert_issues_cset.py issues.json issues_git.json hglog.json gitlog.json
+   $ convert_issues.py issues.json issues_git.json hglog.json gitlog.json
 
 """
 import json
@@ -145,7 +145,7 @@ class BbToGh(object):
         return content
 
 
-def convert_issues_cset(infile, outfile, hglogfile, gitlogfile):
+def convert_issues(infile, outfile, hglogfile, gitlogfile):
     with open(hglogfile) as f:
         hglogs = json.load(f)['messages']
     with open(gitlogfile) as f:
@@ -177,4 +177,4 @@ if __name__ == '__main__':
         'Usage:\n  {} input.json output.json hglog.json gitlog.json'.format(sys.argv[0]))
         sys.exit(-1)
 
-    convert_issues_cset(infile, outfile, hglogfile, gitlogfile)
+    convert_issues(infile, outfile, hglogfile, gitlogfile)

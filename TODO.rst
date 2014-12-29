@@ -13,9 +13,9 @@ procedure
 
    $ gitlog2json.py /path/to/sphinx-git gitlog.json
 
-4. convert changeset in the issues.json::
+4. convert BB links and changeset markers in the issues.json::
 
-   $ convert_issues_cset.py issues.json issues_git.json hglog.json gitlog.json
+   $ convert_issues.py issues.json issues_git.json hglog.json gitlog.json
 
 5. push issues to github::
 
