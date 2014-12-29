@@ -145,7 +145,13 @@ class BbToGh(object):
         return content
 
 
-def convert_issues(infile, outfile, hglogfile, gitlogfile):
+def convert_issue_content(n2h, issue):
+    issue['issue']['content'] = n2h.convert_all(issue['issue']['content'])
+    for comment in issue['comments']:
+        comment['body'] = n2h.convert_all(comment['body'])
+
+
+def main(infile, outfile, hglogfile, gitlogfile):
     with open(hglogfile) as f:
         hglogs = json.load(f)['messages']
     with open(gitlogfile) as f:
@@ -161,9 +167,7 @@ def convert_issues(infile, outfile, hglogfile, gitlogfile):
     )
 
     for issue in issues['issues']:
-        issue['issue']['content'] = n2h.convert_all(issue['issue']['content'])
-        for comment in issue['comments']:
-            comment['body'] = n2h.convert_all(comment['body'])
+        convert_issue_content(n2h, issue)
 
     with open(outfile, 'w') as f:
         json.dump(issues, f, indent=4)
@@ -177,4 +181,4 @@ if __name__ == '__main__':
         'Usage:\n  {} input.json output.json hglog.json gitlog.json'.format(sys.argv[0]))
         sys.exit(-1)
 
-    convert_issues(infile, outfile, hglogfile, gitlogfile)
+    main(infile, outfile, hglogfile, gitlogfile)
