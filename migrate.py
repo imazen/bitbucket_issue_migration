@@ -277,6 +277,16 @@ def github_label(github_repo, name, color="FFFFFF"):
     return label
 
 
+def wait_and_retry(func, *args, **kwargs):
+    while 1:
+        try:
+            time.sleep(1)
+            return func(*args, **kwargs)
+        except:
+            output('w')
+            time.sleep(60)
+
+
 def add_comments_to_issue(github_issue, bb_comments, dry_run=False, verbose=False):
     """ Migrates all comments from a Bitbucket issue to its Github copy. """
 
@@ -296,7 +306,7 @@ def add_comments_to_issue(github_issue, bb_comments, dry_run=False, verbose=Fals
         else:
             logging.info('Adding comment %d', i + 1)
             if not dry_run:
-                github_issue.create_comment(body.encode('utf-8'))
+                wait_and_retry(github_issue.create_comment, body.encode('utf-8'))
                 output('.')
             if verbose:
                 output(body)
@@ -320,8 +330,11 @@ def push_issue(github_repo, issue, dry_run=False, verbose=False):
         else:
             github_labels = [github_label(github_repo, issue['status'])]
 
-        github_issue = github_repo.create_issue(
-            issue['title'], body=issue['formatted'].encode('utf-8'), labels=github_labels)
+        github_issue = wait_and_retry(
+            github_repo.create_issue,
+            issue['title'],
+            body=issue['formatted'].encode('utf-8'),
+            labels=github_labels)
 
         # Set the status and labels
         if issue.get('status') == 'resolved':
@@ -443,6 +456,8 @@ class IssueCache(object):
 
 
 def iter_issue_from_file(infile, start=0, cache_dir=None):
+    if start > 0:
+        start -= 1
     data = json.load(infile)
     for issue in data['issues'][start:]:
         cache = IssueCache(cache_dir, issue['id'])
