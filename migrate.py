@@ -73,29 +73,33 @@ def read_arguments():
     )
 
     parser.add_argument(
-        "bb_user",
+        "-u", "--bitbucket_username", dest="bb_user",
         help="Your Bitbucket username"
     )
 
     parser.add_argument(
-        "bb_repo",
+        "-s", "--bitbucket_repo", dest="bb_repo",
         help="Bitbucket repository to pull data from."
     )
 
     parser.add_argument(
-        "github_user",
+        "-g", "--github-username", dest="github_user",
         help="Your GitHub username"
     )
 
     parser.add_argument(
-        "github_repo",
+        "-d", "--github_repo", dest="github_repo",
         help="GitHub to add issues to. Format: <username>/<repo name>"
     )
 
     parser.add_argument(
+        "-k", "--github_token", dest="github_token",
+        help="The GitHub token to be used for authentication when adding issues to an organization")
+
+    parser.add_argument(
         "-n", "--dry-run",
         action="store_true", dest="dry_run", default=False,
-        help="Perform a dry run."
+        help="Preform a dry run and print eveything."
     )
 
     parser.add_argument(
@@ -122,6 +126,11 @@ def read_arguments():
     parser.add_argument(
         "-c", "--cache-dir", dest="cache_dir", default='.cache',
         help="cache directory. default=.cache"
+    )
+
+    parser.add_argument(
+        "-m", "--meta_trans", dest="json_trans", default="meta_trans.json",
+        help="JSON with BitBucket metadata to GitHub labels translation"
     )
 
     return parser.parse_args()
@@ -266,6 +275,52 @@ def get_comments(bb_url, issue_id):
     return comments
 
 
+def prepare_milestones(gh_repo, use_milestone=None):
+    created_milestones = []
+
+    # Always re-read milestones and labels since we continously create them
+    gh_milestones = {m.title: m.number for m in gh_repo.get_milestones()}
+
+    # Should we create this milestone?
+    milestone_tobe_create = None
+    if use_milestone and use_milestone not in gh_milestones:
+        milestone_tobe_create = use_milestone
+        created_milestones += [milestone_tobe_create]
+
+    return gh_milestones, created_milestones, milestone_tobe_create
+
+
+def prepare_labels(gh_repo, issue, meta_trans):
+    bb_meta = issue['metadata']
+
+    # Always re-read milestones and labels since we continously create them
+    gh_labels = [l.name for l in gh_repo.get_labels()]
+
+    # What labels will be used for this issue?
+    used_labels = []
+    if bb_meta['component']:
+        if bb_meta['component'] in meta_trans['comp']:
+            used_labels.extend(meta_trans['comp'][bb_meta['component']])
+        else:
+            # If no translation is found for the component the label will have
+            # the same component name
+            used_labels.append(bb_meta['component'])
+
+    if bb_meta['kind']:
+        used_labels += meta_trans['kind'][bb_meta['kind']]
+    if issue.get('status'):
+        used_labels += meta_trans['status'][issue['status']]
+    if issue.get('priority'):
+        used_labels += meta_trans['prio'][issue['priority']]
+
+    labels_tobe_create = []
+    for l in used_labels:
+        if l not in gh_labels:
+            labels_tobe_create += [l]
+
+    return used_labels, labels_tobe_create
+
+
 # Cache Github tags, to avoid unnecessary API requests
 @memoize()
 def github_label(github_repo, name, color="FFFFFF"):
@@ -315,33 +370,44 @@ def add_comments_to_issue(github_issue, bb_comments, dry_run=False, verbose=Fals
 
 
 # GitHub push
-def push_issue(github_repo, issue, dry_run=False, verbose=False):
+def push_issue(github_repo, issue, meta_trans, dry_run=False, verbose=False):
     """ Migrates the given Bitbucket issue to Github. """
 
     output('Adding issue [%d]: %s' % (issue['local_id'], issue['title']))
 
     github_issue = None
+    github_labels, labels_tobe_create = prepare_labels(github_repo, issue, meta_trans)
+
+    bb_meta = issue['metadata']
+    used_milestone = bb_meta['milestone']
+    _, created_milestones, milestone_tobe_create = prepare_milestones(github_repo, used_milestone)
+
     if not dry_run:
-        github_labels = []
         # Set the status and labels
-        if issue.get('status') == 'resolved':
-            pass
-        # Everything else is done with labels in github
-        else:
-            github_labels = [github_label(github_repo, issue['status'])]
+        github_labels = [github_label(github_repo, l) for l in github_labels]
+
+        # Create a milestone
+        if milestone_tobe_create:
+            output("Creating new milestone: {0}\n".format(milestone_tobe_create))
+            github_repo.create_milestone(milestone_tobe_create)
+        gh_milestones, _, _ = prepare_milestones(github_repo)
 
         github_issue = wait_and_retry(
             github_repo.create_issue,
             issue['title'],
             body=issue['formatted'].encode('utf-8'),
+            milestone=gh_milestones.get(used_milestone),
             labels=github_labels)
 
-        # Set the status and labels
-        if issue.get('status') == 'resolved':
+        # Set the status of the issue
+        if issue.get('status') in ['resolved', 'duplicate', 'wontfix', 'invalid']:
             github_issue.edit(state='closed')
 
     if verbose:
         output(issue['formatted'])
+        output(u"Issue will tagged with these labels: {0}\n".format(github_labels))
+        output(u"Need to create the following labels: {0}\n".format(labels_tobe_create))
+        output(u"Milestone: {0}\n".format(used_milestone))
         output('\n')
 
     # Milestones
@@ -349,16 +415,21 @@ def push_issue(github_repo, issue, dry_run=False, verbose=False):
     return github_issue
 
 
-def prepare_github(github_user, github_repo):
-    while True:
-        github_password = getpass.getpass("Github password: ")
-        try:
-            Github(github_user, github_password).get_user().login
-            break
-        except Exception:
-            output("Bad credentials, try again.\n")
+def prepare_github(github_user, github_repo, token=None):
 
-    github = Github(github_user, github_password)
+    if token:
+        output("Authenticating to GitHub using token\n")
+        github = Github(token)
+    else:
+        output("Log into Gituhub as {0}\n".format(github_user))
+        while True:
+            github_password = getpass.getpass("Github password: ")
+            try:
+                Github(github_user, github_password).get_user().login
+                break
+            except Exception:
+                output("Bad credentials, try again.\n")
+        github = Github(github_user, github_password)
 
     github_user = github.get_user()
 
@@ -486,8 +557,8 @@ def iter_issue_from_bb(bb_url, bb_user, bb_repo, start=0, cache_dir=None):
         yield {'id': issue_id, 'issue': issue, 'comments': comments}
 
 
-def push_issues_to_github(issue, github_repo, dry_run=False, verbose=False):
-    github_issue = push_issue(github_repo, issue['issue'], dry_run, verbose)
+def push_issues_to_github(issue, github_repo, meta_trans, dry_run=False, verbose=False):
+    github_issue = push_issue(github_repo, issue['issue'], meta_trans, dry_run, verbose)
     add_comments_to_issue(github_issue, issue['comments'], dry_run, verbose)
 
 
@@ -503,9 +574,17 @@ def main(options):
         options.bb_repo
     )
 
+    # load meta trans
+    try:
+        meta_trans = json.load(open(options.json_trans))
+    except Exception as e:
+        print "Could not open file {0}: {1}".format(options.json_trans, str(e))
+        sys.exit(1)
+
     # prepare github information
     if not options.dry_run:
-        github_repo = prepare_github(options.github_user, options.github_repo)
+        github_repo = prepare_github(
+            options.github_user, options.github_repo, options.github_token)
     else:
         github_repo = None
 
@@ -523,7 +602,7 @@ def main(options):
         for i, issue in enumerate(iter_issue()):
             issue['issue']['formatted'] = format_body(
                 options.bb_user, options.bb_repo, issue['issue'])
-            push_issues_to_github(issue, github_repo, options.dry_run, options.verbose)
+            push_issues_to_github(issue, github_repo, meta_trans, options.dry_run, options.verbose)
         output("Created {} issues\n".format(i + 1))
 
 

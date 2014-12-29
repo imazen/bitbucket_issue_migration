@@ -3,7 +3,7 @@ procedure
 
 1. dump issues to json file::
 
-   $ migrate.py birkenfeld sphinx shimizukawa sphinx-doc/testing-bb-issues -o issues.json -n
+   $ migrate.py -u birkenfeld -s sphinx -g shimizukawa -d sphinx-doc/testing -o issues.json -n
 
 2. clone hg repository as sphinx-hg and create hglog.json::
 
@@ -19,7 +19,7 @@ procedure
 
 5. push issues to github::
 
-   $ migrate.py birkenfeld sphinx shimizukawa sphinx-doc/testing-bb-issues -i issues_git.json
+   $ migrate.py -u birkenfeld -s sphinx -g shimizukawa -d sphinx-doc/testing -t <gh-api-token> -i test1b.json
 
 TODO
 =======
