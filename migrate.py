@@ -506,7 +506,8 @@ def main(options):
         output("Created {} issues to: {}\n".format(issues_count, options.outfile.name))
     else:
         for i, issue in enumerate(iter_issue()):
-            issue['formatted'] = format_body(options.bb_user, options.bb_repo, issue)
+            issue['issue']['formatted'] = format_body(
+                options.bb_user, options.bb_repo, issue['issue'])
             push_issues_to_github(issue, github_repo, options.dry_run, options.verbose)
         output("Created {} issues\n".format(i + 1))
 
