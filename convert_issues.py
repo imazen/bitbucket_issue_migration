@@ -22,9 +22,12 @@ import urlparse
 import logging
 import datetime
 
+import dateutil.parser
+
+
 logging.basicConfig(
     format='%(levelname)s: %(message)s',
-    level=logging.DEBUG
+    level=logging.WARNING
 )
 logger = logging.getLogger(__name__)
 
@@ -34,19 +37,28 @@ class BbToGh(object):
         self.bb_url = bb_url.rstrip('/')
         self.gh_url = gh_url.rstrip('/')
         self.hg_to_git = {}
-        date_to_hg = {}
+        self.hg_dates = {}
+        key_to_hg = {}
 
         for hg_log in hg_logs:
             node = hg_log['node'].strip()
-            date_to_hg[hg_log['date'].strip()] = node
+            date = dateutil.parser.parse(hg_log['date'])
+            self.hg_dates[node] = date
+            key = (date, hg_log['desc'].strip())
+            key_to_hg.setdefault(key, []).append(node)
+            if len(key_to_hg[key]) > 1:
+                logger.warning('duplicates "%s"\n %r', date, key_to_hg[key])
             self.hg_to_git[node] = None
 
         for git_log in git_logs:
-            date = git_log['date'].strip()
-            if date not in date_to_hg:
-                # logger.warning('%r is not found in hg log', git_log)
+            date = dateutil.parser.parse(git_log['date'])
+            key = (date, git_log['desc'].strip())
+            if key not in key_to_hg:
+                logger.warning('"%s" is not found in hg log', date)
                 continue
-            self.hg_to_git[date_to_hg[date]] = git_log['node'].strip()
+            for node in key_to_hg[key]:
+                # override duplicates by newest git hash
+                self.hg_to_git[node] = git_log['node'].strip()
 
         self.sorted_nodes = sorted(self.hg_to_git)
 
@@ -56,13 +68,18 @@ class BbToGh(object):
             return None
         full_node = self.sorted_nodes[idx]
         if full_node.startswith(hg_node):
-            return self.hg_to_git[full_node]
+            return full_node
         return None
 
     def hgnode_to_githash(self, hg_node):
-        git_hash = self.find_hg_node(hg_node)
+        if hg_node in ('tip',):
+            return None
+        full_node = self.find_hg_node(hg_node)
+        git_hash = self.hg_to_git[full_node]
         if git_hash is None:
-            logger.warning('%r is not found in hg log', hg_node)
+            logger.warning(
+                'hg node %s "%s" is not found in git log',
+                hg_node, self.hg_dates[full_node])
             return None
 
         return git_hash
@@ -210,7 +227,8 @@ if __name__ == '__main__':
         infile, outfile, hglogfile, gitlogfile = sys.argv[1:5]
     except (ValueError, IndexError):
         print(
-        'Usage:\n  {} input.json output.json hglog.json gitlog.json'.format(sys.argv[0]))
+            'Usage:\n  {} input.json output.json hglog.json gitlog.json'.format(
+                sys.argv[0]))
         sys.exit(-1)
 
     main(infile, outfile, hglogfile, gitlogfile)
