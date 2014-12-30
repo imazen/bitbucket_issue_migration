@@ -168,7 +168,7 @@ def convert_issue_content(n2h, issue):
     issue['issue']['content'] = n2h.convert_all(issue['issue']['content'])
     for comment in issue['comments']:
         comment['body'] = n2h.convert_all(comment['body'])
-
+    issue['comments'] = sorted(issue['comments'], key=lambda c: c["created_at"])
 
 def insert_missing_issue(issues):
     class RetryException(BaseException):
