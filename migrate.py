@@ -520,6 +520,7 @@ class IssueCache(object):
             for f in os.listdir(path)
             if f.startswith(self.COMMENT_FILE_PREFIX)
         ]
+        comments = sorted(comments, key=lambda c: c["created_at"])
         return comments
 
     @comments.setter
