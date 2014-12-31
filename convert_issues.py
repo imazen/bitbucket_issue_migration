@@ -38,6 +38,7 @@ class BbToGh(object):
         self.gh_url = gh_url.rstrip('/')
         self.hg_to_git = {}
         self.hg_dates = {}
+        self.hg_revnum_to_hg_node = {}
         key_to_hg = {}
 
         for hg_log in hg_logs:
@@ -49,6 +50,7 @@ class BbToGh(object):
             if len(key_to_hg[key]) > 1:
                 logger.warning('duplicates "%s"\n %r', date, key_to_hg[key])
             self.hg_to_git[node] = None
+            self.hg_revnum_to_hg_node[hg_log['revnum']] = node
 
         for git_log in git_logs:
             date = dateutil.parser.parse(git_log['date'])
@@ -75,6 +77,13 @@ class BbToGh(object):
         if hg_node in ('tip',):
             return None
         full_node = self.find_hg_node(hg_node)
+        if full_node is None:
+            if hg_node.isdigit():
+                hg_node = self.hg_revnum_to_hg_node[int(hg_node)]
+                full_node = self.find_hg_node(hg_node)
+                if full_node is None:
+                    logger.warning('hg node %s is not found in hg log', hg_node)
+                    return None
         git_hash = self.hg_to_git[full_node]
         if git_hash is None:
             logger.warning(
@@ -94,15 +103,19 @@ class BbToGh(object):
 
     def convert_cset_marker(self, content):
         r"""
-        replace '<<cset 0f18c81b53fc>>' pattern in content.
-
-        before: '<<cset 0f18c81b53fc>>'  (hg-node)
+        before-1: '<<cset 0f18c81b53fc>>'  (hg-node)
+        before-2: '<<changeset 0f18c81b53fc>>'  (hg-node)
+        before-3: '<<changeset 123:0f18c81b53fc>>'  (hg-node)
+        before-4: '<<changeset 123>>'  (hg-node)
         after: '\<\<cset 20fa9c09b23e\>\>'  (git-hash)
         """
-        hg_nodes = re.findall(r'<<cset ([^>]+)>>', content)
-        for hg_node in hg_nodes:
-            git_hash = self.hgnode_to_githash(hg_node)
-            content = content.replace(r'<<cset %s>>' % hg_node,
+        captures = re.findall(r'<<(cset|changeset) ([^>]+)>>', content)
+        for marker, hg_node in captures:
+            if ':' in hg_node:  # for '718:714c805d842f'
+                git_hash = self.hgnode_to_githash(hg_node.split(':')[1])
+            else:
+                git_hash = self.hgnode_to_githash(hg_node)
+            content = content.replace(r'<<%s %s>>' % (marker, hg_node),
                                       r'\<\<cset %s\>\>' % git_hash)
         return content
 
