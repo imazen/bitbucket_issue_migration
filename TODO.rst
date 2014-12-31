@@ -24,5 +24,11 @@ procedure
 TODO
 =======
 
+* over looking '<<changeset hash>>' pattern
+
+* comments without body is omitted by 'migrate.py' that introduce confusion for human.
+
+* [@user](bitbucket/user/url) instead of @user in the GitHub
+
 * write documentation
 
