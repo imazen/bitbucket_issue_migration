@@ -21,6 +21,7 @@ import bisect
 import urlparse
 import logging
 import datetime
+import urllib
 
 import dateutil.parser
 
@@ -30,6 +31,44 @@ logging.basicConfig(
     level=logging.WARNING
 )
 logger = logging.getLogger(__name__)
+
+
+class memoize(object):
+    def __init__(self):
+        self.cache = {}
+
+    def make_key(self, *args, **kw):
+        key = '-'.join(str(a) for a in args)
+        key += '-'.join(str(k) + '=' + str(v) for k, v in kw.items())
+        return key
+
+    def __call__(self, func):
+        def wrap(*args, **kw):
+            key = self.make_key(*args, **kw)
+            if key in self.cache:
+                return self.cache[key]
+            res = func(*args, **kw)
+            self.cache[key] = res
+            return res
+
+        return wrap
+
+
+@memoize()
+def is_user_exist_in_bb(user):
+    if user in ('name', 'names', 'class', 'import', 'property', 'ubuntu', 'wrap',
+                'github', 'for', 'enumerate', 'item', 'itemize', 'type', 'title',
+                'empty', 'replace', 'gmail', 'id', 'href', 'app', 'echo'):
+        logging.info('user @%s is skipped. It\'s a some code.', user)
+        return False
+    base_user_api_url = 'https://bitbucket.org/api/1.0/users/'
+    uo = urllib.urlopen(base_user_api_url + user)
+    if uo.code == 200:
+        logging.debug('user @%s is exist in BB.', user)
+        return True
+    else:
+        logging.debug('user @%s is not found in BB.', user)
+        return False
 
 
 class BbToGh(object):
@@ -99,6 +138,7 @@ class BbToGh(object):
         content = self.convert_bb_cset_link(content)
         content = self.convert_bb_issue_link(content)
         content = self.convert_bb_src_link(content)
+        content = self.convert_bb_user_link(content)
         return content
 
     def convert_cset_marker(self, content):
@@ -174,6 +214,20 @@ class BbToGh(object):
             to_ = self.gh_url + '/issues/%s' % issue_id
             content = content.replace(from_, to_)
             logging.info("%s -> %s", from_, to_)
+        return content
+
+    def convert_bb_user_link(self, content):
+        r"""
+        before: '@username'
+        after: '[@username](https://bitbucket.org/username)'
+        """
+        #base_url = self.bb_url
+        base_url = 'https://bitbucket.org/'
+        pattern = r'(^|[^a-zA-Z0-9])@([a-zA-Z][a-zA-Z0-9_-]+)\b'
+        for prefix, user in re.findall(pattern, content):
+            if is_user_exist_in_bb(user):
+                content = re.sub(pattern, r'\1[$\2](%s)' % (base_url + user), content)
+        content = re.sub(r'\[\$([^]]+)\]', r'[@\1]', content)
         return content
 
 
