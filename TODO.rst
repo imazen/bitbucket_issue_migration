@@ -19,7 +19,7 @@ procedure
 
 5. push issues to github::
 
-   $ migrate.py -u birkenfeld -s sphinx -g shimizukawa -d sphinx-doc/testing -t <gh-api-token> -i test1b.json
+   $ migrate.py -u birkenfeld -s sphinx -g shimizukawa -d sphinx-doc/testing -k <gh-api-token> -i issues_git.json
 
 TODO
 =======
