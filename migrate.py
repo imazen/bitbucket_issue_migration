@@ -247,6 +247,16 @@ def get_issues(bb_url, start_id):
     return issues
 
 
+def convert_bb_comment_for_gh(comment):
+    comment = {
+        'user': format_user(comment['author_info']),
+        'created_at': comment['utc_created_on'],
+        'body': comment['content'] or '',
+        'number': comment['comment_id']
+    }
+    return comment
+
+
 def get_comments(bb_url, issue_id):
     """
     Fetch the comments for a Bitbucket issue
@@ -256,22 +266,7 @@ def get_comments(bb_url, issue_id):
         issue_id
     )
     result = json.loads(urllib2.urlopen(url).read())
-    ordered = sorted(result, key=lambda comment: comment["utc_created_on"])
-
-    comments = []
-    for comment in ordered:
-        body = comment['content'] or ''
-
-        # Status comments (assigned, version, etc. changes) have in bitbucket
-        # no body
-        if body:
-            comments.append({
-                'user': format_user(comment['author_info']),
-                'created_at': comment['utc_created_on'],
-                'body': body,
-                'number': comment['comment_id']
-            })
-
+    comments = sorted(result, key=lambda comment: comment["utc_created_on"])
     return comments
 
 
@@ -559,6 +554,12 @@ def iter_issue_from_bb(bb_url, bb_user, bb_repo, start=0, cache_dir=None):
         else:
             output('comments of issue [%d] is not changed\n' % issue_id)
             comments = cache.comments
+
+        comments = [convert_bb_comment_for_gh(c) for c in comments]
+
+        # File attached comments have in bitbucket no body
+        comments = [c for c in comments if c['body']]  # filter no body comment
+
         yield {'id': issue_id, 'issue': issue, 'comments': comments}
 
 

@@ -24,7 +24,5 @@ procedure
 TODO
 =======
 
-* comments without body is omitted by 'migrate.py' that introduce confusion for human.
-
 * write documentation
 
