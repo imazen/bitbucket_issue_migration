@@ -21,7 +21,7 @@ import bisect
 import urlparse
 import logging
 import datetime
-import urllib
+import requests
 
 import dateutil.parser
 
@@ -55,20 +55,20 @@ class memoize(object):
 
 
 @memoize()
-def is_user_exist_in_bb(user):
+def get_bb_username(user):
     if user in ('name', 'names', 'class', 'import', 'property', 'ubuntu', 'wrap',
                 'github', 'for', 'enumerate', 'item', 'itemize', 'type', 'title',
                 'empty', 'replace', 'gmail', 'id', 'href', 'app', 'echo'):
         logging.info('user @%s is skipped. It\'s a some code.', user)
         return False
     base_user_api_url = 'https://bitbucket.org/api/1.0/users/'
-    uo = urllib.urlopen(base_user_api_url + user)
-    if uo.code == 200:
+    res = requests.get(base_user_api_url + user)
+    if res.status_code == 200:
         logging.debug('user @%s is exist in BB.', user)
-        return True
+        return res.json()['user']['display_name']
     else:
         logging.debug('user @%s is not found in BB.', user)
-        return False
+        return None
 
 
 class BbToGh(object):
@@ -225,9 +225,10 @@ class BbToGh(object):
         base_url = 'https://bitbucket.org/'
         pattern = r'(^|[^a-zA-Z0-9])@([a-zA-Z][a-zA-Z0-9_-]+)\b'
         for prefix, user in re.findall(pattern, content):
-            if is_user_exist_in_bb(user):
-                content = re.sub(pattern, r'\1[$\2](%s)' % (base_url + user), content)
-        content = re.sub(r'\[\$([^]]+)\]', r'[@\1]', content)
+            name = get_bb_username(user)
+            if name is not None:
+                content = re.sub(pattern, r'\1[%s](%s)' % (name, base_url + user),
+                                 content)
         return content
 
 
