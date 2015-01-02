@@ -522,7 +522,7 @@ class IssueCache(object):
     def comments(self, comments):
         self.delete_comments()
         for comment in comments:
-            self.save('{0}{1[number]}.json'.format(self.COMMENT_FILE_PREFIX, comment),
+            self.save('{0}{1[comment_id]}.json'.format(self.COMMENT_FILE_PREFIX, comment),
                       comment)
 
 
