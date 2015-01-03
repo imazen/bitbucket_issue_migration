@@ -139,6 +139,7 @@ class BbToGh(object):
         content = self.convert_bb_issue_link(content)
         content = self.convert_bb_src_link(content)
         content = self.convert_bb_user_link(content)
+        content = self.convert_bb_pr_marker(content)
         return content
 
     def convert_cset_marker(self, content):
@@ -179,6 +180,17 @@ class BbToGh(object):
             to_ = ' %s ' % git_hash
             content = content.replace(from_, to_)
             logging.info("%s -> %s", from_, to_)
+        return content
+
+    def convert_bb_pr_marker(self, content):
+        r"""
+        before: 'pull request #123'
+        after: self.bb_url + '/pull-request/123'
+        """
+        captures = re.findall(r'\b(pull request #(\d+))\b', content)
+        for replacer, pr_number in captures:
+            content = content.replace(replacer,
+                                      '%s/pull-request/%s' % (self.bb_url, pr_number))
         return content
 
     def convert_bb_src_link(self, content):
