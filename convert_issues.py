@@ -169,14 +169,14 @@ class BbToGh(object):
     def convert_bb_cset_link(self, content):
         r"""
         before: bb_url + '/commits/e282b3a8ef4802da3a685f10b5e9a39633e2c23a'
-        after: gh_url + '/commit/1d063726ee185dce974f919f2ae696bd1b6b826b'
+        after: ' 1d063726ee185dce974f919f2ae696bd1b6b826b '
         """
         base_url = self.bb_url + '/commits/'
         url_pairs = re.findall(base_url + r'([0-9a-f]+)(/?)', content)
         for hg_node, rest_of_url in url_pairs:
             git_hash = self.hgnode_to_githash(hg_node)
             from_ = base_url + hg_node + rest_of_url
-            to_ = self.gh_url + '/commit/%s' % git_hash
+            to_ = ' %s ' % git_hash
             content = content.replace(from_, to_)
             logging.info("%s -> %s", from_, to_)
         return content
@@ -205,13 +205,13 @@ class BbToGh(object):
     def convert_bb_issue_link(self, content):
         r"""
         before: bb_url + '/issue/63/make-sphinx'
-        after: gh_url + '/issues/7'
+        after: '#63'
         """
         base_url = self.bb_url + '/issue/'
         issue_pairs = re.findall(base_url + r'(\d+)(/[\w\d.,_-]*)?', content)
         for issue_id, rest_of_url in issue_pairs:
             from_ = base_url + issue_id + rest_of_url
-            to_ = self.gh_url + '/issues/%s' % issue_id
+            to_ = '#%s' % issue_id
             content = content.replace(from_, to_)
             logging.info("%s -> %s", from_, to_)
         return content
@@ -277,7 +277,7 @@ def main(infile, outfile, hglogfile, gitlogfile):
         hglogs,
         gitlogs,
         'https://bitbucket.org/birkenfeld/sphinx',
-        'https://github.com/sphinx-doc/testing'
+        'https://github.com/sphinx-doc/sphinx'
     )
 
     for issue in issues['issues']:
