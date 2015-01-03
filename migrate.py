@@ -528,14 +528,11 @@ class IssueCache(object):
                       comment)
 
 
-def iter_issue_from_file(infile, start=0, cache_dir=None):
+def iter_issue_from_file(infile, start=0):
     if start > 0:
         start -= 1
     data = json.load(infile)
     for issue in data['issues'][start:]:
-        # cache = IssueCache(cache_dir, issue['id'])
-        # cache.issue = issue['issue']
-        # cache.comments = issue['comments']
         yield issue
 
 
@@ -597,8 +594,7 @@ def main(options):
         github_repo = None
 
     if options.infile:
-        iter_issue = lambda: iter_issue_from_file(options.infile, options.start,
-                                                  options.cache_dir)
+        iter_issue = lambda: iter_issue_from_file(options.infile, options.start)
     else:
         iter_issue = lambda: iter_issue_from_bb(bb_url, options.start, options.cache_dir)
 
