@@ -286,6 +286,8 @@ def prepare_milestones(gh_repo, use_milestone=None):
 
 
 def prepare_labels(gh_repo, issue, meta_trans):
+    if 'metadata' not in issue:
+        return [], []
     bb_meta = issue['metadata']
 
     # Always re-read milestones and labels since we continously create them
@@ -372,8 +374,8 @@ def push_issue(github_repo, issue, meta_trans, dry_run=False, verbose=False):
     github_issue = None
     github_labels, labels_tobe_create = prepare_labels(github_repo, issue, meta_trans)
 
-    bb_meta = issue['metadata']
-    used_milestone = bb_meta['milestone']
+    bb_meta = issue.get('metadata', {})
+    used_milestone = bb_meta.get('milestone')
     _, created_milestones, milestone_tobe_create = prepare_milestones(github_repo, used_milestone)
 
     if not dry_run:
@@ -531,9 +533,9 @@ def iter_issue_from_file(infile, start=0, cache_dir=None):
         start -= 1
     data = json.load(infile)
     for issue in data['issues'][start:]:
-        cache = IssueCache(cache_dir, issue['id'])
-        cache.issue = issue['issue']
-        cache.comments = issue['comments']
+        # cache = IssueCache(cache_dir, issue['id'])
+        # cache.issue = issue['issue']
+        # cache.comments = issue['comments']
         yield issue
 
 
