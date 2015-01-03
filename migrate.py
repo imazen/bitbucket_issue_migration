@@ -539,7 +539,7 @@ def iter_issue_from_file(infile, start=0, cache_dir=None):
         yield issue
 
 
-def iter_issue_from_bb(bb_url, bb_user, bb_repo, start=0, cache_dir=None):
+def iter_issue_from_bb(bb_url, start=0, cache_dir=None):
     issues = get_issues(bb_url, start)
 
     # Sort issues, to sync issue numbers on freshly created GitHub projects.
@@ -600,8 +600,7 @@ def main(options):
         iter_issue = lambda: iter_issue_from_file(options.infile, options.start,
                                                   options.cache_dir)
     else:
-        iter_issue = lambda: iter_issue_from_bb(
-            bb_url, options.bb_user, options.bb_repo, options.start, options.cache_dir)
+        iter_issue = lambda: iter_issue_from_bb(bb_url, options.start, options.cache_dir)
 
     if options.outfile:
         issues_count = write_issues_to_file(iter_issue(), options.outfile)
