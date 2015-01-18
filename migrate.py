@@ -400,9 +400,10 @@ def push_issue(github_repo, issue, meta_trans, dry_run=False, verbose=False):
             milestone=milestone,
             labels=github_labels)
 
-        # Set the status of the issue
-        if issue.get('status') in ['resolved', 'duplicate', 'wontfix', 'invalid']:
-            github_issue.edit(state='closed')
+        # Set the state of the issue
+        state = meta_trans['state'].get(issue.get('status'))
+        if state:
+            github_issue.edit(state=state)
 
     if verbose:
         output(issue['formatted'])
