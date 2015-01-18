@@ -1,9 +1,8 @@
-=========
-Tutorial
+Examples
 =========
 
 procedure to transfer sphinx issues
-====================================
+------------------------------------
 
 1. dump issues to json file::
 

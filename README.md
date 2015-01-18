@@ -12,7 +12,7 @@ You will need to install the requirements first
 
     pip install -r requirements.pip
 
-## Example
+## Usage
     
     python migrate.py -h
     usage: migrate.py [-h] [-n] [-f START]
@@ -20,24 +20,23 @@ You will need to install the requirements first
                       github_repo
 
     A tool to migrate issues from Bitbucket to GitHub. note: the Bitbucket
-    repository and issue tracker have to bepublic
+    repository and issue tracker have to be public
 
-    positional arguments:
-      bitbucket_username    Your Bitbucket username
-      bitbucket_repo        Bitbucket repository to pull data from.
-      github_username       Your GitHub username
-      github_repo           GitHub to add issues to. Format: <username>/<repo
-                            name>
+    required arguments:
+      -s BITBUCKET_REPO, --bitbucket_repo=BITBUCKET_REPO
+                            Bitbucket repo to pull data from.
+      -u BITBUCKET_USERNAME, --bitbucket_username=BITBUCKET_USERNAME
+                            Bitbucket username
+      -g GITHUB_USERNAME, --github_username=GITHUB_USERNAME
+                            Your GitHub username
+      -d GITHUB_REPO, --github_repo=GITHUB_REPO
+                            GitHub to add issues to. Format: <username>/<repo name>
 
     optional arguments:
       -h, --help            show this help message and exit
       -n, --dry-run         Perform a dry run and print eveything.
       -f START, --start_id START
                             Bitbucket issue id from which to start import
-      -s BITBUCKET_REPO, --bitbucket_repo=BITBUCKET_REPO
-                            Bitbucket repo to pull data from.
-      -u BITBUCKET_USERNAME, --bitbucket_username=BITBUCKET_USERNAME
-                            Bitbucket username
       -m JSON_META_TRANS, --meta_trans
                             JSON with BitBucket metadata to GitHub labels translation. Defaults to meta_trans.json
       -k GITHUB_API_TOKEN, --github_token
@@ -51,3 +50,8 @@ and use the GITHUB_API_TOKEN for authentication.
 Note: If there's no meta mapping for a component from BitBucket, then a label with the origional name will be used.
 
 None: All issues that are not new or open on BitBucket will be closed on GitHub (i.e wontfix, duplicate, invalid, closed)
+
+## Examples
+
+ref. examples.md
+
