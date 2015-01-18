@@ -53,5 +53,5 @@ None: All issues that are not new or open on BitBucket will be closed on GitHub 
 
 ## Examples
 
-ref. examples.md
+ref. EXAMPLES.md
 
