@@ -1,5 +1,9 @@
-procedure
-==========
+=========
+Tutorial
+=========
+
+procedure to transfer sphinx issues
+====================================
 
 1. dump issues to json file::
 
@@ -15,14 +19,9 @@ procedure
 
 4. convert BB links and changeset markers in the issues.json::
 
-   $ convert_issues.py issues.json issues_git.json hglog.json gitlog.json
+   $ convert_issues.py -s birkenfeld/sphinx -d sphinx-doc/sphinx -i issues.json -o issues_git.json -m hglog.json -g gitlog.json
 
 5. push issues to github::
 
    $ migrate.py -u birkenfeld -s sphinx -g shimizukawa -d sphinx-doc/testing -k <gh-api-token> -i issues_git.json
-
-TODO
-=======
-
-* write documentation
 

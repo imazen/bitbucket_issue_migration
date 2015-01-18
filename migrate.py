@@ -115,7 +115,7 @@ def read_arguments():
 
     parser.add_argument(
         "-i", "--input", type=file, dest="infile", default=None,
-        help="Input issues filename to post to Bitbucket"
+        help="Input issues filename to post to Github (was written by -o option)"
     )
 
     parser.add_argument(
