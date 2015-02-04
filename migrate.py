@@ -216,6 +216,7 @@ def get_comments(bb_url, issue):
                 'created_at': comment['utc_created_on'],
                 'body': body.encode('utf-8'),
                 'number': comment['comment_id']
+                'issue_id' : issue['local_id']
             })
 
     return comments
