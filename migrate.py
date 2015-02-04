@@ -285,13 +285,15 @@ if __name__ == "__main__":
         options.bitbucket_repo
     )
 
-    # fetch issues from Bitbucket
-    issues = get_issues(bb_url, options.start)
 
+    
     # push them in GitHub (issues comments are fetched here)
     github_password = getpass.getpass("Please enter your GitHub password\n")
     github = Github(login=options.github_username, password=github_password)
     gh_username, gh_repository = options.github_repo.split('/')
+
+    # fetch issues from Bitbucket
+    issues = get_issues(bb_url, options.start)
 
     # Sort issues, to sync issue numbers on freshly created GitHub projects.
     # Note: not memory efficient, could use too much memory on large projects.
