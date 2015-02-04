@@ -78,15 +78,24 @@ def read_arguments():
 # Formatters
 def format_user(author_info):
     if not author_info:
-        return "Anonymous"
+        return u"Anonymous"
 
-    if author_info['first_name'] and author_info['last_name']:
-        return " ".join([author_info['first_name'], author_info['last_name']])
+    display_name = author_info['display_name']
+
+    if (not display_name or display_name.isspace()) and author_info['first_name'] and author_info['last_name']:
+        display_name = u" ".join([author_info['first_name'], author_info['last_name']])
+
+    if display_name.isspace():
+      display_name = u""
+    else:
+      display_name = u" ({})".format(display_name)
 
     if 'username' in author_info:
-        return '[{0}](http://bitbucket.org/{0})'.format(
-            author_info['username']
+        return u'[{0}{1}](http://bitbucket.org/{0})'.format(
+            author_info['username'], display_name
         )
+    else:
+      return "Anonymous" if display_name.isspace() else display_name
 
 def format_date(datestr):
   return dateutil.parser.parse(datestr).strftime('%b %d %Y')
