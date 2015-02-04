@@ -217,13 +217,28 @@ def get_comments(bb_url, issue):
         # Status comments (assigned, version, etc. changes) have in bitbucket
         # no body
         if body:
-            comments.append({
-                'user': format_user(comment['author_info']),
-                'created_at': comment['utc_created_on'],
-                'body': body,
-                'number': comment['comment_id'],
-                'issue_id' : issue['local_id']
-            })
+
+          api_url = u"https://api.bitbucket.org/1.0/repositories/{}/{}/issues/{}/comments/{}".format(
+            options.bitbucket_username,
+            options.bitbucket_repo,
+            issue['local_id'],
+            comment['comment_id'])
+          url = u"https://bitbucket.org/{}/{}/issue/{}/comments/#comment-{}".format(
+            options.bitbucket_username,
+            options.bitbucket_repo,
+            issue['local_id'],
+            comment['comment_id'])
+
+
+          comments.append({
+              'user': format_user(comment['author_info']),
+              'created_at': comment['utc_created_on'],
+              'body': body,
+              'number': comment['comment_id'],
+              'issue_id' : issue['local_id'],
+              'api_url': api_url,
+              'url': url
+          })
 
     return comments
 
