@@ -235,6 +235,12 @@ def push_issue(gh_username, gh_repository, issue, body, comments, options):
         'title': issue.get('title').encode('utf-8'),
         'body': body.encode('utf-8')
     }
+
+    print u"Uploading issue https://api.bitbucket.org/1.0/repositories/{}/{}/issues/{}".format(
+        options.bitbucket_username,
+        options.bitbucket_repo,
+        issue['local_id'])
+
     new_issue = github.issues.create(
         issue_data,
         gh_username,
