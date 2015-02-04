@@ -115,13 +115,13 @@ def format_body(options, issue):
 {}
 - Bitbucket: https://bitbucket.org/{}/{}/issue/{}
 - Originally reported by: {}
-- Originally created at: {}
+- Originally created on: {}
 """.format(
         content,
         '-' * 40,
         options.bitbucket_username, options.bitbucket_repo, issue['local_id'],
         format_name(issue),
-        issue['created_on']
+        format_date(issue['created_on'])
     )
 
 
@@ -129,11 +129,17 @@ def format_comment(comment):
     return u"""{}
 
 {}
-Original comment by: {}
+Originally posted by {} on [{} via Bitbucket](https://bitbucket.org/{}/{}/issue/{}/comments/#comment-{})
 """.format(
         comment['body'],
         '-' * 40,
-        comment['user'].encode('utf-8')
+        comment['user'],
+        format_date(comment['created_at']),
+        options.bitbucket_username, 
+        options.bitbucket_repo,
+        comment['issue_id'],
+        comment['number']
+
     )
 
 
