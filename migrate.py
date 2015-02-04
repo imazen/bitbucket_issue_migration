@@ -21,6 +21,8 @@
 import argparse
 import urllib2
 import getpass
+import dateutil.parser
+import requests
 
 from pygithub3 import Github
 
@@ -85,6 +87,9 @@ def format_user(author_info):
         return '[{0}](http://bitbucket.org/{0})'.format(
             author_info['username']
         )
+
+def format_date(datestr):
+  return dateutil.parser.parse(datestr).strftime('%b %d %Y')
 
 
 def format_name(issue):
