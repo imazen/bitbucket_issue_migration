@@ -220,8 +220,8 @@ def get_comments(bb_url, issue):
             comments.append({
                 'user': format_user(comment['author_info']),
                 'created_at': comment['utc_created_on'],
-                'body': body.encode('utf-8'),
-                'number': comment['comment_id']
+                'body': body,
+                'number': comment['comment_id'],
                 'issue_id' : issue['local_id']
             })
 
@@ -229,11 +229,11 @@ def get_comments(bb_url, issue):
 
 
 # GitHub push
-def push_issue(gh_username, gh_repository, issue, body, comments):
+def push_issue(gh_username, gh_repository, issue, body, comments, options):
     # Create the issue
     issue_data = {
         'title': issue.get('title').encode('utf-8'),
-        'body': body
+        'body': body.encode('utf-8')
     }
     new_issue = github.issues.create(
         issue_data,
@@ -284,8 +284,8 @@ def push_issue(gh_username, gh_repository, issue, body, comments):
     for comment in comments:
         github.issues.comments.create(
             new_issue.number,
-            format_comment(comment),
-            gh_username,
+            format_comment(comment).encode("utf-8"),
+            gh_username.encode("utf-8"),
             gh_repository
         )
 
@@ -321,8 +321,8 @@ if __name__ == "__main__":
             print "Body: {}".format(
                 format_body(options, issue).encode('utf-8')
             )
-            print "Comments", [comment['body'] for comment in comments]
+            print "Comments", [format_comment(comment).encode("utf-8") for comment in comments]
         else:
-            body = format_body(options, issue).encode('utf-8')
-            push_issue(gh_username, gh_repository, issue, body, comments)
-            print "Created {} issues".format(len(issues))
+            body = format_body(options, issue)
+            push_issue(gh_username, gh_repository, issue, body, comments,options)
+    print "Created {} issues".format(len(issues))
