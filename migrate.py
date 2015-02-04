@@ -23,6 +23,8 @@ import urllib2
 import getpass
 import dateutil.parser
 import requests
+import time
+import math
 
 from pygithub3 import Github
 
@@ -70,6 +72,11 @@ def read_arguments():
     parser.add_argument(
         "-f", "--start_id", type=int, dest="start", default=0,
         help="Bitbucket issue id from which to start import"
+    )
+
+    parser.add_argument(
+        "-r", "--retry_count", type=int, dest="retry_count", default=8,
+        help="Number of times to retry a failed API call"
     )
 
     return parser.parse_args()
@@ -242,6 +249,21 @@ def get_comments(bb_url, issue):
 
     return comments
 
+def retry(callback, data_a, data_b):
+    error_count = 0;
+    while True:
+      try: 
+        return callback()
+      except requests.exceptions.HTTPError, err:
+        error_count += 1
+        print u"Error {} during API request ({} api req. remaining)\n{}\n{}".format(str(err), github.remaining_requests, data_a,data_b)
+        if error_count <= options.retry_count:
+          delay = math.round(math.exp(error_count))
+          print "Retrying after {}s ... {}/{}".format(delay,error_count, options.retry_count)
+          time.sleep(delay)
+          continue
+        else:
+          raise
 
 # GitHub push
 def push_issue(gh_username, gh_repository, issue, body, comments, options):
@@ -251,25 +273,31 @@ def push_issue(gh_username, gh_repository, issue, body, comments, options):
         'body': body.encode('utf-8')
     }
 
-    print u"Uploading issue https://api.bitbucket.org/1.0/repositories/{}/{}/issues/{}".format(
+    issue_api_url = u"https://api.bitbucket.org/1.0/repositories/{}/{}/issues/{}".format(
         options.bitbucket_username,
         options.bitbucket_repo,
         issue['local_id'])
 
-    new_issue = github.issues.create(
+    def create_issue():
+
+     return github.issues.create(
         issue_data,
         gh_username,
-        gh_repository
-    )
+        gh_repository)
+      
+
+    new_issue = retry(create_issue, issue_api_url,"")
 
     # Set the status and labels
     if issue.get('status') == 'resolved':
+      def update_issue():
         github.issues.update(
             new_issue.number,
             {'state': 'closed'},
             user=gh_username,
             repo=gh_repository
         )
+      retry(update_issue, issue_api_url,"")
 
     # Everything else is done with labels in github
     # TODO: there seems to be a problem with the add_to_issue method of
@@ -303,12 +331,16 @@ def push_issue(gh_username, gh_repository, issue, body, comments, options):
 
     # Add the comments
     for comment in comments:
-        github.issues.comments.create(
-            new_issue.number,
-            format_comment(comment).encode("utf-8"),
-            gh_username.encode("utf-8"),
-            gh_repository
-        )
+      def create_comment():
+          github.issues.comments.create(
+              new_issue.number,
+              format_comment(comment).encode("utf-8"),
+              gh_username.encode("utf-8"),
+              gh_repository
+            )
+
+      retry(create_comment, comment['api_url'], comment['url'])
+
 
     print u"Created: {} [{} comments]".format(
         issue['title'], len(comments)
